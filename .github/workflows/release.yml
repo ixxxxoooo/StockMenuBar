@@ -11,7 +11,8 @@ permissions:
 
 jobs:
   release:
-    runs-on: macos-15
+    # macOS 26 / Xcode 26 才带 Liquid Glass 相关 API,发布产物需要用它构建(项目最低部署目标仍为 macOS 14)
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 

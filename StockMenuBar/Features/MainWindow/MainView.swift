@@ -77,10 +77,13 @@ struct MainView: View {
         .searchable(text: $filter, placement: .sidebar, prompt: "过滤:名称 / 代码 / 拼音")
         .toolbar {
             ToolbarItemGroup {
+                // 关闭焦点环:弹出层关闭后焦点会回到按钮,系统会画出蓝色圆环
                 Button { showAdd = true } label: { Image(systemName: "plus") }
+                    .focusEffectDisabled()
                     .help("搜索并添加自选")
                     .popover(isPresented: $showAdd, arrowEdge: .bottom) { AddStockView() }
                 Button { showGroupManager = true } label: { Image(systemName: "folder.badge.gearshape") }
+                    .focusEffectDisabled()
                     .help("管理分组")
             }
         }
@@ -89,14 +92,14 @@ struct MainView: View {
         .overlay(alignment: .bottomLeading) { settingsButton }
     }
 
-    /// 侧栏左下角的设置图标:悬浮的圆形小按钮,不占独立的一行
+    /// 侧栏左下角的设置图标:与工具栏按钮同款的 Liquid Glass 圆形小按钮,不占独立的一行
     private var settingsButton: some View {
         Button { nav.selection = .settings } label: {
             Image(systemName: "gearshape")
-                .font(.system(size: 14))
-                .foregroundStyle(nav.selection == .settings ? Color.accentColor : Color.secondary)
-                .frame(width: 28, height: 28)
-                .background(.regularMaterial, in: Circle())
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(nav.selection == .settings ? Color.accentColor : Color.primary.opacity(0.75))
+                .frame(width: 30, height: 30)
+                .glassCircle()
                 .contentShape(Circle())
                 .overlay(alignment: .topTrailing) {
                     // 有新版本时在齿轮右上角提示一个红点
@@ -106,6 +109,7 @@ struct MainView: View {
                 }
         }
         .buttonStyle(.plain)
+        .focusEffectDisabled()
         .help(env.updates.hasAvailableUpdate ? "偏好设置 (⌘,) · 有新版本可更新" : "偏好设置 (⌘,)")
         .padding(.leading, 10)
         .padding(.bottom, 8)

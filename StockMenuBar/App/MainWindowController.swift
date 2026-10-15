@@ -24,6 +24,7 @@ final class MainWindowController: NSObject, NSWindowDelegate {
         let window = ensureWindow()
         // 主面板打开期间转为常规应用:Dock 显示图标、可 Cmd+Tab 切换
         NSApp.setActivationPolicy(.regular)
+        AppIconProvider.apply()
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()

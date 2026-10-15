@@ -7,7 +7,12 @@ on:
 
 jobs:
   test:
-    runs-on: macos-15
+    # 同时覆盖旧工具链(macOS 15 / Xcode 16,走降级样式)与新工具链(macOS 26,走 Liquid Glass)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - name: 安装 XcodeGen
@@ -24,7 +29,7 @@ jobs:
 
   # 预演打包,避免发版时才发现打包脚本损坏
   package:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - name: 安装 XcodeGen

@@ -13,5 +13,6 @@ MainActor.assumeIsolated {
     let delegate = AppDelegate()
     app.delegate = delegate
     app.setActivationPolicy(.accessory)
+    AppIconProvider.apply()
     app.run()
 }
