@@ -125,8 +125,15 @@ final class UpdateManager {
     }
 
     private func autoCheckIfDue() async {
-        guard prefs.autoCheckUpdates, !isBusy else { return }
-        if let last = prefs.lastUpdateCheck, Date().timeIntervalSince(last) < Self.autoCheckInterval { return }
+        guard prefs.autoCheckUpdates else {
+            UpdateInstaller.appendLog("自动检查:已在设置中关闭")
+            return
+        }
+        guard !isBusy else { return }
+        if let last = prefs.lastUpdateCheck, Date().timeIntervalSince(last) < Self.autoCheckInterval {
+            UpdateInstaller.appendLog("自动检查:距上次检查不足 6 小时,跳过(上次 \(last))")
+            return
+        }
         await check(userInitiated: false)
     }
 
