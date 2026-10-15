@@ -40,11 +40,12 @@ struct FuturesSymbolTests {
         #expect(StockSymbol(full: "sh600519")?.market == .sh)
     }
 
-    @Test func 默认期货分组覆盖铜煤东京() {
+    @Test func 默认期货分组覆盖铜煤() {
         let names = FuturesCatalog.defaults.map(\.name)
         #expect(names.contains("沪铜主连") && names.contains("伦铜") && names.contains("COMEX铜"))
         #expect(names.contains("焦煤主连") && names.contains("焦炭主连"))
-        #expect(names.contains("日经225"))
+        // 日经 225 归入「全球指数」分组
+        #expect(FuturesCatalog.globalIndices.map(\.name).contains("日经225"))
         for preset in FuturesCatalog.all { #expect(StockSymbol(full: preset.symbol.full) == preset.symbol) }
     }
 

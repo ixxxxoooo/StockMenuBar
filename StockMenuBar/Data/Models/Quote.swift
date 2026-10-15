@@ -206,6 +206,24 @@ struct MinuteSeries: Sendable, Equatable {
 
     /// 最新价
     var lastPrice: Double? { bars.last?.price }
+
+    /// 最后一根分时的序号
+    var lastIndex: Int { bars.last?.index ?? -1 }
+
+    /// A 股分时完整性:数据日期是今天且已过 9:40 时,最后一根分时不应落后当前交易分钟太多。
+    /// 用于识别「只返回了一部分」的数据源响应;期货/全球指数与非当日数据一律视为完整。
+    /// - Parameter now: 当前时间
+    func isComplete(now: Date) -> Bool {
+        guard !symbol.isFuture, let date, date == ChinaTime.dayString(now).replacingOccurrences(of: "-", with: "") else { return true }
+        let minute = ChinaTime.minuteOfDay(now)
+        guard !ChinaTime.isWeekend(now), minute >= 9 * 60 + 40 else { return true }
+        let expected: Int
+        if minute >= 900 { expected = 240 }
+        else if minute <= 690 { expected = minute - 570 }
+        else if minute < 780 { expected = 120 }
+        else { expected = minute - 780 + 120 }
+        return lastIndex >= expected - 10
+    }
 }
 
 /// 搜索联想结果

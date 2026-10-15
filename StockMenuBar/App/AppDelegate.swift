@@ -98,6 +98,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// 菜单「偏好设置…」(⌘,):打开主面板并跳转到设置页
+    @objc private func openPreferences() {
+        mainWindow.show(settings: true)
+    }
+
     // MARK: - 主菜单(accessory 应用没有菜单栏,但需要 Edit 菜单让 ⌘C/⌘V/⌘A 在搜索框中可用)
 
     private func installMainMenu() {
@@ -105,6 +110,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
+        let prefs = NSMenuItem(title: "偏好设置…", action: #selector(openPreferences), keyEquivalent: ",")
+        prefs.target = self
+        appMenu.addItem(prefs)
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "退出 StockMenuBar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         main.addItem(appItem)

@@ -15,7 +15,15 @@ struct EastmoneyProvider: QuoteProvider {
 
     init(http: HTTPClient) { self.http = http }
 
+    /// 未被东财收录的预置品种(如韩国创业板)直接跳过
+    func canServe(_ capability: ProviderCapability, symbol: StockSymbol?) -> Bool {
+        guard capabilities.contains(capability) else { return false }
+        guard let symbol, symbol.isFuture else { return true }
+        return FuturesCatalog.eastmoneySupports(secid: symbol.code)
+    }
+
     func fetchQuotes(_ symbols: [StockSymbol]) async throws -> [Quote] {
+        let symbols = symbols.filter { !$0.isFuture || FuturesCatalog.eastmoneySupports(secid: $0.code) }
         guard !symbols.isEmpty else { return [] }
         var all: [Quote] = []
         for chunk in ParseUtil.chunked(symbols, size: 80) {
@@ -88,7 +96,7 @@ enum EastmoneyParser {
             if price <= 0 { price = prev }
             result.append(Quote(
                 symbol: symbol,
-                name: item["f14"] as? String ?? symbol.code,
+                name: (symbol.isFuture ? FuturesCatalog.preset(secid: symbol.code)?.name : nil) ?? item["f14"] as? String ?? symbol.code,
                 price: price,
                 prevClose: prev,
                 open: ParseUtil.double(item["f17"]) ?? 0,

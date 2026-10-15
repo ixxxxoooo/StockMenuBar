@@ -33,7 +33,7 @@ struct RouterConfig: Sendable {
     var failureThreshold: Int = 3
     var openDuration: TimeInterval = 30
     /// 各源初始延迟先验(秒),决定冷启动时的优先顺序
-    var latencyPrior: [ProviderID: TimeInterval] = [.tencent: 0.30, .sina: 0.40, .eastmoney: 0.50]
+    var latencyPrior: [ProviderID: TimeInterval] = [.tencent: 0.30, .sina: 0.40, .eastmoney: 0.50, .yahoo: 0.90]
 
     static let `default` = RouterConfig()
 }
@@ -82,13 +82,14 @@ actor ProviderRouter {
         }
     }
 
-    /// 默认装配:腾讯、新浪、东财三源
+    /// 默认装配:腾讯、新浪、东财三源 + 雅虎(全球指数/外盘期货的兜底)
     static func makeDefault() -> ProviderRouter {
         let http = URLSessionHTTPClient()
         let providers: [any QuoteProvider] = [
             TencentProvider(http: http),
             SinaProvider(http: http),
-            EastmoneyProvider(http: http)
+            EastmoneyProvider(http: http),
+            YahooProvider(http: http)
         ]
         return ProviderRouter(providers: FaultInjection.apply(to: providers))
     }
@@ -129,10 +130,14 @@ actor ProviderRouter {
         var result = try await routeQuoteBatch(symbols, futures: futures, excluding: [])
         // 期货各数据源覆盖的品种不同:首选源缺失的品种,交给其余数据源补一次(尽力而为,失败忽略)
         if futures {
-            let got = Set(result.value.map(\.symbol))
-            let missing = symbols.filter { !got.contains($0) }
-            if !missing.isEmpty,
-               let extra = try? await routeQuoteBatch(missing, futures: true, excluding: [result.provider]) {
+            var tried: Set<ProviderID> = [result.provider]
+            // 最多补 3 轮:每轮只请求仍缺失的品种,并排除已尝试过的数据源
+            for _ in 0..<3 {
+                let got = Set(result.value.map(\.symbol))
+                let missing = symbols.filter { !got.contains($0) }
+                guard !missing.isEmpty,
+                      let extra = try? await routeQuoteBatch(missing, futures: true, excluding: tried) else { break }
+                tried.insert(extra.provider)
                 result = RoutedResult(value: result.value + extra.value, provider: result.provider, latency: result.latency)
             }
         }
@@ -153,9 +158,11 @@ actor ProviderRouter {
     }
 
     /// 获取当日分时
-    func minute(for symbol: StockSymbol) async throws -> RoutedResult<MinuteSeries> {
+    /// - Parameter excluding: 排除的数据源(上一个源返回的数据不完整时,换源重试)
+    func minute(for symbol: StockSymbol, excluding: Set<ProviderID> = []) async throws -> RoutedResult<MinuteSeries> {
         let capability: ProviderCapability = symbol.isFuture ? .futuresMinute : .minute
         return try await execute(capability: capability,
+                                 excluding: excluding,
                                  coverage: { provider in Self.coverage(of: provider, capability: capability, symbols: [symbol]) },
                                  validate: { (s: MinuteSeries) in !s.bars.isEmpty && s.prevClose > 0 },
                                  operation: { provider in try await provider.fetchMinute(symbol: symbol) })

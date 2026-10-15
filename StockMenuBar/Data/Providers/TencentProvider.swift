@@ -10,14 +10,30 @@ import Foundation
 
 struct TencentProvider: QuoteProvider {
     let id: ProviderID = .tencent
-    let capabilities: Set<ProviderCapability> = [.quotes, .minute, .search]
+    let capabilities: Set<ProviderCapability> = [.quotes, .minute, .search, .futuresQuotes, .futuresMinute]
     private let http: HTTPClient
 
     init(http: HTTPClient) { self.http = http }
 
+    /// 期货/全球指数:腾讯只覆盖美股指数(`usDJI` 等),其余由其他源承担
+    func canServe(_ capability: ProviderCapability, symbol: StockSymbol?) -> Bool {
+        guard capabilities.contains(capability) else { return false }
+        guard let symbol, symbol.isFuture else { return true }
+        return FuturesCatalog.tencentCode(secid: symbol.code) != nil
+    }
+
     func fetchQuotes(_ symbols: [StockSymbol]) async throws -> [Quote] {
         guard !symbols.isEmpty else { return [] }
         var all: [Quote] = []
+        let globals = symbols.filter { $0.isFuture && FuturesCatalog.tencentCode(secid: $0.code) != nil }
+        if !globals.isEmpty {
+            let list = globals.compactMap { FuturesCatalog.tencentCode(secid: $0.code) }.joined(separator: ",")
+            guard let url = URL(string: "https://qt.gtimg.cn/q=\(list)") else { throw ProviderError.invalidData("URL") }
+            let data = try await http.send(URLRequest(url: url))
+            guard let text = TextCodec.decodeGBK(data) else { throw ProviderError.invalidData("编码") }
+            all += TencentParser.parseGlobalQuotes(text, requested: globals)
+        }
+        let symbols = symbols.filter { !$0.isFuture }
         for chunk in ParseUtil.chunked(symbols, size: 60) {
             let list = chunk.map(\.full).joined(separator: ",")
             guard let url = URL(string: "https://qt.gtimg.cn/q=\(list)") else { throw ProviderError.invalidData("URL") }
@@ -29,6 +45,14 @@ struct TencentProvider: QuoteProvider {
     }
 
     func fetchMinute(symbol: StockSymbol) async throws -> MinuteSeries {
+        if symbol.isFuture {
+            guard let code = FuturesCatalog.tencentCode(secid: symbol.code),
+                  let url = URL(string: "https://web.ifzq.gtimg.cn/appstock/app/UsMinute/query?code=\(code)") else {
+                throw ProviderError.unsupported
+            }
+            let data = try await http.send(URLRequest(url: url))
+            return try TencentParser.parseUSMinute(data, symbol: symbol, code: code)
+        }
         guard let url = URL(string: "https://web.ifzq.gtimg.cn/appstock/app/minute/query?code=\(symbol.full)") else {
             throw ProviderError.invalidData("URL")
         }
@@ -92,6 +116,81 @@ enum TencentParser {
             result.append(quote)
         }
         return result
+    }
+
+    /// 解析美股指数行情(腾讯 `usDJI` 等)。字段:
+    /// 1 名称, 3 现价, 4 昨收, 5 今开, 6 成交量(股), 30 时间(美东), 31 涨跌额, 33 最高, 34 最低
+    /// - Parameters:
+    ///   - text: 响应文本
+    ///   - requested: 请求的标的,用于把腾讯代码反查回 `StockSymbol`
+    static func parseGlobalQuotes(_ text: String, requested: [StockSymbol]) -> [Quote] {
+        var result: [Quote] = []
+        for raw in text.split(whereSeparator: { $0 == "\n" || $0 == ";" }) {
+            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard line.hasPrefix("v_"), let eq = line.firstIndex(of: "=") else { continue }
+            let key = String(line[line.index(line.startIndex, offsetBy: 2)..<eq])
+            guard let symbol = FuturesCatalog.symbol(tencentKey: key, among: requested) else { continue }
+            let payload = line[line.index(after: eq)...].trimmingCharacters(in: CharacterSet(charactersIn: "\" "))
+            let f = payload.split(separator: "~", omittingEmptySubsequences: false).map(String.init)
+            guard f.count > 34 else { continue }
+            func d(_ i: Int) -> Double? { i < f.count ? Double(f[i]) : nil }
+            let prev = d(4) ?? 0
+            var price = d(3) ?? 0
+            if price <= 0 { price = prev }
+            result.append(Quote(
+                symbol: symbol,
+                name: FuturesCatalog.preset(secid: symbol.code)?.name ?? f[1],
+                price: price, prevClose: prev, open: d(5) ?? 0,
+                high: d(33) ?? price, low: d(34) ?? price,
+                volume: d(6) ?? 0, amount: 0, turnover: nil, bids: [], asks: [],
+                time: easternTime(f[30]), source: .tencent,
+                openInterest: nil, decimalsHint: 2))
+        }
+        return result
+    }
+
+    /// 解析美东时间 `yyyy-MM-dd HH:mm:ss`
+    static func easternTime(_ text: String) -> Date? {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "America/New_York")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.date(from: text)
+    }
+
+    /// 解析美股指数分时 `UsMinute`:`data.<code>.data.data` 为 `"HHMM 价格 累计量"`(美东时间,9:30-16:00),
+    /// 昨收取自 `qt.<code>[4]`。横轴为美东 9:30-16:00 共 390 分钟。
+    static func parseUSMinute(_ data: Data, symbol: StockSymbol, code: String) throws -> MinuteSeries {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let dataNode = root["data"] as? [String: Any],
+              let node = dataNode[code] as? [String: Any],
+              let inner = node["data"] as? [String: Any],
+              let lines = inner["data"] as? [String] else {
+            throw ProviderError.invalidData("分时结构")
+        }
+        var prevClose = 0.0
+        if let qt = node["qt"] as? [String: Any], let arr = qt[code] as? [String], arr.count > 4 {
+            prevClose = Double(arr[4]) ?? 0
+        }
+        let axis = MinuteAxis(segments: [.init(start: 9 * 60 + 30, end: 16 * 60)])
+        var bars: [MinuteBar] = []
+        var lastCum = 0.0
+        for line in lines {
+            let parts = line.split(separator: " ")
+            guard parts.count >= 3, let hhmm = Int(parts[0]), let price = Double(parts[1]), price > 0,
+                  let idx = axis.index(forMinute: hhmm / 100 * 60 + hhmm % 100) else { continue }
+            let cum = Double(parts[2]) ?? lastCum
+            let vol = max(cum - lastCum, 0)
+            lastCum = max(cum, lastCum)
+            if let last = bars.last, last.index == idx { bars.removeLast() }
+            bars.append(MinuteBar(index: idx, price: price, volume: vol, avgPrice: nil))
+        }
+        guard !bars.isEmpty else { throw ProviderError.invalidData("分时为空") }
+        if prevClose <= 0 { prevClose = bars[0].price }
+        var series = MinuteSeries(symbol: symbol, prevClose: prevClose, date: inner["date"] as? String, bars: bars, source: .tencent)
+        series.axis = axis
+        series.decimalsHint = 2
+        return series
     }
 
     /// 解析分时 JSON:`data.<code>.data.data` 为 `"HHMM 价格 累计量(手) 累计额"`,

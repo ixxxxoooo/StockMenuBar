@@ -88,9 +88,11 @@ struct SettingsView: View {
                 ForEach(statuses) { status in
                     statusRow(status)
                 }
-                Text("三个数据源按延迟与成功率自动排序,主源失败/超时会自动切换并对冲请求;连续失败 3 次熔断 30 秒后探测恢复。数据来自公开接口,可能存在延迟,仅供个人参考,不构成投资建议。")
+                Text("多个数据源(腾讯、新浪、东财、雅虎)按延迟与成功率自动排序,各自覆盖的品种不同;主源失败/超时会自动切换并对冲请求;连续失败 3 次熔断 30 秒后探测恢复。数据来自公开接口,可能存在延迟,仅供个人参考,不构成投资建议。")
                     .font(.footnote).foregroundStyle(.secondary)
             }
+
+            aboutSection
         }
         .formStyle(.grouped)
         .navigationTitle("偏好设置")
@@ -98,6 +100,26 @@ struct SettingsView: View {
             while !Task.isCancelled {
                 statuses = await env.router.statuses()
                 try? await Task.sleep(for: .seconds(2))
+            }
+        }
+    }
+
+    /// 关于:作者、项目简介与 GitHub 链接(位于页面最底部)
+    private var aboutSection: some View {
+        Section("关于") {
+            LabeledContent("应用") { Text("StockMenuBar  \(AppInfo.version)") }
+            LabeledContent("作者") {
+                Link(AppInfo.author, destination: URL(string: "https://github.com/\(AppInfo.author)")!)
+            }
+            LabeledContent("简介") {
+                Text(AppInfo.summary).multilineTextAlignment(.trailing).foregroundStyle(.secondary)
+            }
+            LabeledContent("技术栈") { Text(AppInfo.techStack).foregroundStyle(.secondary) }
+            LabeledContent("开源协议") { Text("MIT License").foregroundStyle(.secondary) }
+            LabeledContent("项目地址") {
+                Link(destination: AppInfo.repositoryURL) {
+                    Label(AppInfo.repositoryURL.absoluteString, systemImage: "link")
+                }
             }
         }
     }

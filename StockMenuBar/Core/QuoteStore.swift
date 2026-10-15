@@ -180,6 +180,16 @@ final class QuoteStore {
 
     // MARK: - 分时数据
 
+    /// 取一份尽可能完整的分时:首选源数据不完整(落后于当前交易分钟)时,换源再取一次,择优返回
+    nonisolated private static func fetchBestMinute(router: ProviderRouter, symbol: StockSymbol) async -> MinuteSeries? {
+        guard let first = try? await router.minute(for: symbol) else { return nil }
+        let now = Date()
+        if first.value.isComplete(now: now) { return first.value }
+        guard let second = try? await router.minute(for: symbol, excluding: [first.provider]) else { return first.value }
+        if second.value.isComplete(now: now) || second.value.lastIndex > first.value.lastIndex { return second.value }
+        return first.value
+    }
+
     /// 获取当日分时(带缓存与并发去重)
     /// - Parameters:
     ///   - symbol: 证券
@@ -194,13 +204,13 @@ final class QuoteStore {
 
         let router = self.router
         let task = Task<MinuteSeries?, Never> {
-            try? await router.minute(for: symbol).value
+            await Self.fetchBestMinute(router: router, symbol: symbol)
         }
         minuteInflight[symbol] = task
         var series = await task.value
         minuteInflight[symbol] = nil
-        // 期货:统一以实时行情的昨结算价作为分时基准,避免不同数据源口径(昨收/昨结)不一致
-        if var s = series, symbol.isFuture, let prev = quote(for: symbol)?.prevClose, prev > 0, s.prevClose != prev {
+        // 统一以实时行情的昨收/昨结作为分时基准:避免不同数据源口径不一致,也弥补部分源(新浪 A 股分钟线)不带昨收
+        if var s = series, let prev = quote(for: symbol)?.prevClose, prev > 0, s.prevClose != prev {
             s.prevClose = prev
             series = s
         }
@@ -212,7 +222,8 @@ final class QuoteStore {
     }
 }
 
-/// 分时数据加载器:界面持有,按市场阶段自动轮询(交易中 10 秒、午休 1 分钟、休市只取一次)
+/// 分时数据加载器:界面持有,按市场阶段自动轮询(交易中 10 秒、午休 1 分钟、休市只取一次)。
+/// 加载失败时按指数退避重试(2、4、8…最多 20 秒),不会一直停在失败状态。
 @MainActor
 @Observable
 final class MinuteLoader {
@@ -232,21 +243,32 @@ final class MinuteLoader {
         if series?.symbol != symbol { series = nil }
         isLoading = series == nil
         failed = false
+        var failures = 0
         while !Task.isCancelled {
+            var gotFresh = true
             if !store.isSuspended {
                 if let s = await store.minuteSeries(for: symbol) {
                     series = s
                     failed = false
-                } else if series == nil {
-                    failed = true
+                    failures = 0
+                } else {
+                    gotFresh = false
+                    failures += 1
+                    if series == nil { failed = true }
                 }
             }
             isLoading = false
+            // 失败:指数退避后重试(含期货与休市场景,保证最终能取到数据)
+            if !gotFresh {
+                try? await Task.sleep(for: .seconds(min(Double(1 << min(failures, 4)), 20)))
+                continue
+            }
             let phase = store.currentPhase
             if symbol.isFuture {
-                // 期货:在可能开市的窗口内持续刷新,窗口外取到一次即停
+                // 期货/全球指数:窗口外取到一次即停;行情久未更新(休市)时降低频率
                 if !store.isActivelyTrading(symbol) && series != nil { return }
-                try? await Task.sleep(for: .seconds(max(tradingInterval, 10)))
+                let stale = store.quote(for: symbol)?.time.map { Date().timeIntervalSince($0) > 1800 } ?? false
+                try? await Task.sleep(for: .seconds(stale ? 60 : max(tradingInterval, 10)))
                 continue
             }
             if phase == .closed && series != nil { return }

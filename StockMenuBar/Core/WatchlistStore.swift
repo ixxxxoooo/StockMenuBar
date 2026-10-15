@@ -49,7 +49,7 @@ final class WatchlistStore {
             container = try! ModelContainer(for: schema, configurations: [memory])
         }
         seedIfNeeded()
-        if !inMemory { migrateFuturesGroupIfNeeded() }
+        if !inMemory { migrateCatalogGroupsIfNeeded() }
         reload()
         selectedGroupID = groups.first?.id
     }
@@ -204,13 +204,13 @@ final class WatchlistStore {
     private func seedIfNeeded() {
         let count = (try? context.fetchCount(FetchDescriptor<GroupEntity>())) ?? 0
         guard count == 0 else { return }
-        let seeds: [(String, [(String, String)])] = [
+        var seeds: [(String, [(String, String)])] = [
             ("大盘", [("sh000001", "上证指数"), ("sz399001", "深证成指"), ("sz399006", "创业板指"), ("sh000300", "沪深300")]),
             ("自选A", [("sh600519", "贵州茅台"), ("sz000001", "平安银行"), ("sz300750", "宁德时代")]),
             ("自选B", []),
-            ("ETF", [("sh510300", "沪深300ETF"), ("sz159915", "创业板ETF")]),
-            ("期货", FuturesCatalog.defaults.map { ($0.symbol.full, $0.name) })
+            ("ETF", [("sh510300", "沪深300ETF"), ("sz159915", "创业板ETF")])
         ]
+        seeds += FuturesCatalog.groupSeeds.map { group in (group.name, group.presets.map { ($0.symbol.full, $0.name) }) }
         for (gi, seed) in seeds.enumerated() {
             let g = GroupEntity(name: seed.0, order: gi)
             context.insert(g)
@@ -219,22 +219,37 @@ final class WatchlistStore {
             }
         }
         try? context.save()
-        UserDefaults.standard.set(true, forKey: Self.futuresSeededKey)
+        UserDefaults.standard.set(Self.catalogVersion, forKey: Self.catalogVersionKey)
     }
 
-    /// 期货分组是否已写入过的标记(只写一次,用户删除后不再自动恢复)
-    private static let futuresSeededKey = "watchlist.futuresSeeded"
+    /// 预置分组版本号:每次新增预置分组时 +1,老用户升级时只补写新增的分组
+    private static let catalogVersion = 2
+    private static let catalogVersionKey = "watchlist.catalogVersion"
+    /// 旧版本(仅期货分组)的标记,仅用于判断用户是否已经见过「期货」分组
+    private static let legacyFuturesSeededKey = "watchlist.futuresSeeded"
 
-    /// 老用户升级:自动追加「期货」分组与预置品种(铜、煤、日经),仅执行一次
-    private func migrateFuturesGroupIfNeeded() {
-        guard !UserDefaults.standard.bool(forKey: Self.futuresSeededKey) else { return }
-        UserDefaults.standard.set(true, forKey: Self.futuresSeededKey)
-        let existing = (try? context.fetch(FetchDescriptor<GroupEntity>())) ?? []
-        guard !existing.contains(where: { $0.name == "期货" }) else { return }
-        let g = GroupEntity(name: "期货", order: existing.count)
-        context.insert(g)
-        for (i, preset) in FuturesCatalog.defaults.enumerated() {
-            context.insert(ItemEntity(symbolFull: preset.symbol.full, name: preset.name, order: i, group: g))
+    /// 老用户升级:按版本号补写预置分组(期货 / 贵金属 / 全球指数),每个版本只执行一次。
+    /// - 已存在同名分组则跳过;用户曾删除过「期货」分组(旧标记已置位)不再恢复
+    /// - 已在其他分组中的品种(如日经 225)不重复写入
+    private func migrateCatalogGroupsIfNeeded() {
+        let defaults = UserDefaults.standard
+        guard defaults.integer(forKey: Self.catalogVersionKey) < Self.catalogVersion else { return }
+        defer { defaults.set(Self.catalogVersion, forKey: Self.catalogVersionKey) }
+        let legacySeeded = defaults.bool(forKey: Self.legacyFuturesSeededKey)
+        var existing = (try? context.fetch(FetchDescriptor<GroupEntity>())) ?? []
+        var owned = Set(existing.flatMap { $0.items.map(\.symbolFull) })
+        for group in FuturesCatalog.groupSeeds {
+            if group.name == "期货" && legacySeeded { continue }
+            guard !existing.contains(where: { $0.name == group.name }) else { continue }
+            let presets = group.presets.filter { !owned.contains($0.symbol.full) }
+            guard !presets.isEmpty else { continue }
+            let g = GroupEntity(name: group.name, order: existing.count)
+            context.insert(g)
+            existing.append(g)
+            for (i, preset) in presets.enumerated() {
+                context.insert(ItemEntity(symbolFull: preset.symbol.full, name: preset.name, order: i, group: g))
+                owned.insert(preset.symbol.full)
+            }
         }
         try? context.save()
     }

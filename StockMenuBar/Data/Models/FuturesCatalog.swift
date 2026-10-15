@@ -13,25 +13,35 @@ import Foundation
 enum FuturesCatalog {
     /// 预置品种
     struct Preset: Sendable, Equatable {
-        /// 展示名称
+        /// 展示名称(所有数据源统一使用该名称,避免故障转移时名称跳变)
         let name: String
         /// 东财 secid
         let secid: String
         /// 拼音首字母(本地联想用)
         let pinyin: String
-        /// 新浪代码(含 nf_/hf_ 前缀),为空表示无备源
+        /// 新浪代码(含 nf_/hf_/znb_/gb_ 前缀),为空表示无备源
         let sinaCode: String?
         /// 新浪价格换算系数(如 COMEX 铜新浪为美分/磅,东财为美元/磅,系数 0.01)
         let sinaScale: Double
+        /// 腾讯代码(如 `usDJI`),为空表示腾讯不支持
+        let tencentCode: String?
+        /// 雅虎财经代码(如 `^KS11`、`GC=F`),为空表示雅虎不支持
+        let yahooCode: String?
+        /// 东财是否收录(如韩国创业板东财没有)
+        let inEastmoney: Bool
         /// 所属主题,用于文档与分组
         let theme: String
 
-        init(_ name: String, _ secid: String, _ pinyin: String, sina: String? = nil, scale: Double = 1, theme: String) {
+        init(_ name: String, _ secid: String, _ pinyin: String, sina: String? = nil, scale: Double = 1,
+             tencent: String? = nil, yahoo: String? = nil, eastmoney: Bool = true, theme: String) {
             self.name = name
             self.secid = secid
             self.pinyin = pinyin
             self.sinaCode = sina
             self.sinaScale = scale
+            self.tencentCode = tencent
+            self.yahooCode = yahoo
+            self.inEastmoney = eastmoney
             self.theme = theme
         }
 
@@ -39,28 +49,74 @@ enum FuturesCatalog {
         var symbol: StockSymbol { StockSymbol(market: .future, code: secid) }
     }
 
-    /// 默认写入「期货」分组的品种:铜(沪/伦/美)、煤(焦煤/焦炭)、东京(日经 225)
+    /// 默认写入「期货」分组的品种:铜(沪/伦/美)、煤(焦煤/焦炭)
     static let defaults: [Preset] = [
         Preset("沪铜主连", "113.cum", "HTZL", sina: "nf_CU0", theme: "铜"),
         Preset("伦铜", "109.LCPT", "LT", sina: "hf_CAD", theme: "铜"),
-        Preset("COMEX铜", "101.HG00Y", "COMEXT", sina: "hf_HG", scale: 0.01, theme: "铜"),
+        Preset("COMEX铜", "101.HG00Y", "COMEXT", sina: "hf_HG", scale: 0.01, yahoo: "HG=F", theme: "铜"),
         Preset("焦煤主连", "114.jmm", "JMZL", sina: "nf_JM0", theme: "煤"),
-        Preset("焦炭主连", "114.jm", "JTZL", sina: "nf_J0", theme: "煤"),
-        Preset("日经225", "100.N225", "RJ225", sina: "znb_NKY", theme: "东京")
+        Preset("焦炭主连", "114.jm", "JTZL", sina: "nf_J0", theme: "煤")
+    ]
+
+    /// 默认写入「贵金属」分组的品种:纽约金银(COMEX)、伦敦金银(现货)、沪金沪银
+    static let preciousMetals: [Preset] = [
+        Preset("纽约金", "101.GC00Y", "NYJ", sina: "hf_GC", yahoo: "GC=F", theme: "贵金属"),
+        Preset("伦敦金", "122.XAU", "LDJ", sina: "hf_XAU", theme: "贵金属"),
+        Preset("纽约银", "101.SI00Y", "NYY", sina: "hf_SI", yahoo: "SI=F", theme: "贵金属"),
+        Preset("伦敦银", "122.XAG", "LDY", sina: "hf_XAG", theme: "贵金属"),
+        Preset("沪金主连", "113.aum", "HJZL", sina: "nf_AU0", theme: "贵金属"),
+        Preset("沪银主连", "113.agm", "HYZL", sina: "nf_AG0", theme: "贵金属")
+    ]
+
+    /// 默认写入「全球指数」分组的指数:美股三大指数、日经 225、韩国综合与创业板
+    static let globalIndices: [Preset] = [
+        Preset("道琼斯", "100.DJIA", "DQS", sina: "gb_$dji", tencent: "usDJI", yahoo: "^DJI", theme: "美股指数"),
+        Preset("纳斯达克", "100.NDX", "NSDK", sina: "gb_ixic", tencent: "usIXIC", yahoo: "^IXIC", theme: "美股指数"),
+        Preset("标普500", "100.SPX", "BP500", sina: "gb_inx", tencent: "usINX", yahoo: "^GSPC", theme: "美股指数"),
+        Preset("日经225", "100.N225", "RJ225", sina: "znb_NKY", yahoo: "^N225", theme: "亚洲指数"),
+        Preset("韩国KOSPI", "100.KS11", "HGKOSPI", sina: "znb_KOSPI", yahoo: "^KS11", theme: "亚洲指数"),
+        Preset("韩国KOSDAQ", "100.KQ11", "HGKOSDAQ", sina: "znb_KOSDAQ", yahoo: "^KQ11", eastmoney: false, theme: "亚洲指数")
     ]
 
     /// 可联想的扩展品种(不默认加入自选)
     static let extras: [Preset] = [
         Preset("动力煤主连", "115.ZCM", "DLMZL", sina: "nf_ZC0", theme: "煤"),
         Preset("国际铜主连", "142.bcm", "GJTZL", sina: "nf_BC0", theme: "铜"),
-        Preset("纽约原油", "102.CL00Y", "NYYY", sina: "hf_CL", theme: "能源")
+        Preset("纽约原油", "102.CL00Y", "NYYY", sina: "hf_CL", yahoo: "CL=F", theme: "能源"),
+        Preset("布伦特原油", "112.B00Y", "BLTYY", sina: "hf_OIL", yahoo: "BZ=F", theme: "能源"),
+        Preset("韩国KOSPI200", "100.KOSPI200", "HGKOSPI200", yahoo: "^KS200", theme: "亚洲指数"),
+        Preset("德国DAX30", "100.GDAXI", "DGDAX30", yahoo: "^GDAXI", theme: "欧洲指数"),
+        Preset("英国富时100", "100.FTSE", "YGFS100", yahoo: "^FTSE", theme: "欧洲指数"),
+        Preset("法国CAC40", "100.FCHI", "FGCAC40", yahoo: "^FCHI", theme: "欧洲指数"),
+        Preset("纳斯达克100", "100.NDX100", "NSDK100", yahoo: "^NDX", theme: "美股指数")
+    ]
+
+    /// 首次安装与升级时写入的分组(名称, 品种)
+    static let groupSeeds: [(name: String, presets: [Preset])] = [
+        ("期货", defaults),
+        ("贵金属", preciousMetals),
+        ("全球指数", globalIndices)
     ]
 
     /// 全部预置
-    static var all: [Preset] { defaults + extras }
+    static var all: [Preset] { defaults + preciousMetals + globalIndices + extras }
 
     /// 按 secid 查找预置
     static func preset(secid: String) -> Preset? { all.first { $0.secid == secid } }
+
+    /// 东财是否可能收录该标的(未收录的预置品种直接跳过,避免无意义的失败计数)
+    static func eastmoneySupports(secid: String) -> Bool { preset(secid: secid)?.inEastmoney ?? true }
+
+    /// 腾讯代码(仅美股指数等少数品种)
+    static func tencentCode(secid: String) -> String? { preset(secid: secid)?.tencentCode }
+
+    /// 雅虎代码
+    static func yahooCode(secid: String) -> String? { preset(secid: secid)?.yahooCode }
+
+    /// 腾讯行情键到证券的反查
+    static func symbol(tencentKey: String, among requested: [StockSymbol]) -> StockSymbol? {
+        requested.first { s in s.isFuture && tencentCode(secid: s.code)?.lowercased() == tencentKey.lowercased() }
+    }
 
     // MARK: - 交易所
 
@@ -88,6 +144,8 @@ enum FuturesCatalog {
         case "102": return "NYMEX"
         case "103": return "CBOT"
         case "109": return "LME"
+        case "112": return "ICE"
+        case "122": return "伦敦现货"
         case "100": return "全球指数"
         default: return "外盘"
         }

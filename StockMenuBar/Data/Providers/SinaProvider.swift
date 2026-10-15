@@ -10,17 +10,17 @@ import Foundation
 
 struct SinaProvider: QuoteProvider {
     let id: ProviderID = .sina
-    let capabilities: Set<ProviderCapability> = [.quotes, .search, .futuresQuotes, .futuresMinute]
+    let capabilities: Set<ProviderCapability> = [.quotes, .minute, .search, .futuresQuotes, .futuresMinute]
     private let http: HTTPClient
 
     init(http: HTTPClient) { self.http = http }
 
-    /// 期货:仅能服务有新浪代码映射的标的;分时仅国内期货(nf_)可用
+    /// 期货:仅能服务有新浪代码映射的标的;分时支持国内期货(nf_)与外盘期货(hf_),全球指数(znb_/gb_)无分时
     func canServe(_ capability: ProviderCapability, symbol: StockSymbol?) -> Bool {
         guard capabilities.contains(capability) else { return false }
         guard let symbol, symbol.isFuture else { return true }
         guard let mapping = FuturesCatalog.sinaMapping(secid: symbol.code) else { return false }
-        return capability == .futuresMinute ? mapping.code.hasPrefix("nf_") : true
+        return capability == .futuresMinute ? (mapping.code.hasPrefix("nf_") || mapping.code.hasPrefix("hf_")) : true
     }
 
     func fetchQuotes(_ symbols: [StockSymbol]) async throws -> [Quote] {
@@ -54,19 +54,34 @@ struct SinaProvider: QuoteProvider {
         return SinaParser.parseFuturesQuotes(text, requested: mapped)
     }
 
-    /// 国内期货分时(新浪 getMinLine)
+    /// 分时:A 股/指数(1 分钟 K 线合成)、国内期货(getMinLine)、外盘期货(getGlobalFuturesMinLine)
     func fetchMinute(symbol: StockSymbol) async throws -> MinuteSeries {
-        guard symbol.isFuture, let mapping = FuturesCatalog.sinaMapping(secid: symbol.code), mapping.code.hasPrefix("nf_") else {
-            throw ProviderError.unsupported
-        }
+        if !symbol.isFuture { return try await fetchAShareMinute(symbol: symbol) }
+        guard let mapping = FuturesCatalog.sinaMapping(secid: symbol.code) else { throw ProviderError.unsupported }
         let key = String(mapping.code.dropFirst(3))
-        guard let url = URL(string: "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t=/InnerFuturesNewService.getMinLine?symbol=\(key)") else {
-            throw ProviderError.invalidData("URL")
+        if mapping.code.hasPrefix("nf_") {
+            let data = try await get("https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t=/InnerFuturesNewService.getMinLine?symbol=\(key)")
+            return try SinaParser.parseFuturesMinute(data, symbol: symbol, sinaKey: key)
         }
+        if mapping.code.hasPrefix("hf_") {
+            let data = try await get("https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t=/GlobalFuturesService.getGlobalFuturesMinLine?symbol=\(key)")
+            return try SinaParser.parseGlobalFuturesMinute(data, symbol: symbol, scale: mapping.scale)
+        }
+        throw ProviderError.unsupported
+    }
+
+    /// A 股分时:取 1 分钟 K 线最近 250 根,只保留最新交易日
+    private func fetchAShareMinute(symbol: StockSymbol) async throws -> MinuteSeries {
+        let data = try await get("https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20t=/CN_MarketDataService.getKLineData?symbol=\(symbol.full)&scale=1&ma=no&datalen=250")
+        return try SinaParser.parseAShareMinute(data, symbol: symbol)
+    }
+
+    /// 带 Referer 的 GET 请求
+    private func get(_ urlString: String) async throws -> Data {
+        guard let url = URL(string: urlString) else { throw ProviderError.invalidData("URL") }
         var request = URLRequest(url: url)
         request.setValue("https://finance.sina.com.cn", forHTTPHeaderField: "Referer")
-        let data = try await http.send(request)
-        return try SinaParser.parseFuturesMinute(data, symbol: symbol, sinaKey: key)
+        return try await http.send(request)
     }
 
     func search(keyword: String) async throws -> [SearchResult] {
@@ -153,7 +168,8 @@ enum SinaParser {
 
     /// 解析期货行情。
     /// - 国内 `nf_`:0 名称, 2 今开, 3 最高, 4 最低, 5 昨收, 8 现价, 10 昨结算, 13 持仓量, 14 成交量
-    /// - 全球指数 `znb_`:1 现价, 8 今开, 9 昨收, 10 最高, 11 最低
+    /// - 全球指数 `znb_`:1 现价, 6/7 日期时间, 8 今开, 9 昨收, 10 最高, 11 最低
+    /// - 美股指数 `gb_`:1 现价, 3 时间, 4 涨跌额, 5 今开, 6 最高, 7 最低, 10 成交量, 26 昨收
     /// - 外盘 `hf_`:0 现价, 4 最高, 5 最低, 7 昨收, 8 今开, 13 名称, 14 成交量(价格按预置换算系数折算)
     static func parseFuturesQuotes(_ text: String, requested: [StockSymbol]) -> [Quote] {
         var result: [Quote] = []
@@ -179,6 +195,18 @@ enum SinaParser {
                               high: d(3) ?? price, low: d(4) ?? price, volume: d(14) ?? 0, amount: 0, turnover: nil,
                               bids: [], asks: [], time: nil, source: .sina,
                               openInterest: d(13), decimalsHint: inferDecimals(price))
+            } else if key.lowercased().hasPrefix("gb_") {
+                // 美股指数:1 现价, 3 时间(北京时间), 4 涨跌额, 5 今开, 6 最高, 7 最低, 10 成交量(股), 26 昨收
+                guard f.count > 10 else { continue }
+                // 新浪美股指数价格带浮点噪声(如 51621.4805),统一保留 2 位
+                func r(_ v: Double?) -> Double? { v.map { ($0 * 100).rounded() / 100 } }
+                let price = r(d(1)) ?? 0
+                var prev = r(d(26)) ?? 0
+                if prev <= 0, let change = r(d(4)) { prev = price - change }
+                quote = Quote(symbol: symbol, name: presetName ?? f[0], price: price, prevClose: prev, open: r(d(5)) ?? 0,
+                              high: r(d(6)) ?? price, low: r(d(7)) ?? price, volume: d(10) ?? 0, amount: 0, turnover: nil,
+                              bids: [], asks: [], time: ChinaTime.parse(compact: f[3]), source: .sina,
+                              openInterest: nil, decimalsHint: 2)
             } else if key.lowercased().hasPrefix("znb_") {
                 // 全球指数:1 现价, 8 今开, 9 昨收, 10 最高, 11 最低
                 guard f.count > 11 else { continue }
@@ -187,7 +215,7 @@ enum SinaParser {
                 if price <= 0 { price = prev }
                 quote = Quote(symbol: symbol, name: presetName ?? f[0], price: price, prevClose: prev, open: d(8) ?? 0,
                               high: d(10) ?? price, low: d(11) ?? price, volume: 0, amount: 0, turnover: nil,
-                              bids: [], asks: [], time: nil, source: .sina,
+                              bids: [], asks: [], time: f.count > 7 ? ChinaTime.parse(day: f[6], time: f[7]) : nil, source: .sina,
                               openInterest: nil, decimalsHint: 2)
             } else {
                 guard f.count > 13 else { continue }
@@ -259,5 +287,93 @@ enum SinaParser {
         series.axis = axis
         series.decimalsHint = inferDecimals(bars[0].price)
         return series
+    }
+
+    /// 解析外盘期货分时(getGlobalFuturesMinLine):
+    /// 首行 `[日期, 昨收, 交易所, "", 时间, 价格, 量, 0, 均价, 完整时间]`,其余行 `[时间, 价格, 量, 0, 均价, 完整时间]`。
+    /// 完整时间为北京时间,横轴为单一连续时段(起点取首行时刻,时长按交易所给出)。
+    /// - Parameters:
+    ///   - scale: 价格换算系数(COMEX 铜新浪为美分)
+    static func parseGlobalFuturesMinute(_ data: Data, symbol: StockSymbol, scale: Double) throws -> MinuteSeries {
+        guard let text = String(data: data, encoding: .utf8) ?? TextCodec.decodeGBK(data),
+              let open = text.range(of: "var t=("), let close = text.lastIndex(of: ")") else {
+            throw ProviderError.invalidData("分时结构")
+        }
+        let json = String(text[open.upperBound..<close])
+        guard let root = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [String: Any],
+              let rows = root["minLine_1d"] as? [[Any]], rows.count > 1,
+              let head = rows.first, head.count >= 10 else {
+            throw ProviderError.invalidData("分时为空")
+        }
+        let exchange = (head[2] as? String ?? "").lowercased()
+        let prev = (Double(head[1] as? String ?? "") ?? 0) * scale
+        // 完整时间 `yyyy-MM-dd HH:mm:ss` -> 自首日零点起的分钟
+        func minute(_ row: [Any]) -> (day: Int, minute: Int)? {
+            guard let stamp = row.last as? String, stamp.count >= 16 else { return nil }
+            let parts = stamp.split(separator: " ")
+            guard parts.count == 2, let day = EastmoneyParser.dayNumber(String(parts[0])) else { return nil }
+            let hm = parts[1].split(separator: ":").compactMap { Int($0) }
+            guard hm.count >= 2 else { return nil }
+            return (day, hm[0] * 60 + hm[1])
+        }
+        guard let first = minute(head) else { throw ProviderError.invalidData("分时时间") }
+        // 各交易所连续时段时长(分钟):CME/LIFFE 约 23 小时,LME/ICE 约 19 小时
+        let length = (exchange == "lme" || exchange == "ice") ? 1140 : 1380
+        let axis = MinuteAxis(segments: [.init(start: first.minute, end: first.minute + length)])
+        var bars: [MinuteBar] = []
+        for (i, row) in rows.enumerated() {
+            guard let t = minute(row) else { continue }
+            let priceIndex = i == 0 ? 5 : 1
+            let volIndex = i == 0 ? 6 : 2
+            let avgIndex = i == 0 ? 8 : 4
+            guard row.count > avgIndex, let raw = Double(row[priceIndex] as? String ?? ""), raw > 0,
+                  let idx = axis.index(forMinute: (t.day - first.day) * 1440 + t.minute) else { continue }
+            let avg = (Double(row[avgIndex] as? String ?? "") ?? 0) * scale
+            let vol = Double(row[volIndex] as? String ?? "") ?? 0
+            if let last = bars.last, last.index == idx { bars.removeLast() }
+            bars.append(MinuteBar(index: idx, price: raw * scale, volume: vol, avgPrice: avg > 0 ? avg : nil))
+        }
+        guard !bars.isEmpty else { throw ProviderError.invalidData("分时为空") }
+        let date = (head[0] as? String)?.replacingOccurrences(of: "-", with: "")
+        var series = MinuteSeries(symbol: symbol, prevClose: prev > 0 ? prev : bars[0].price, date: date, bars: bars, source: .sina)
+        series.axis = axis
+        series.decimalsHint = inferDecimals(bars[0].price)
+        return series
+    }
+
+    /// 解析 A 股 1 分钟 K 线并合成分时:`[{"day":"2026-10-15 14:54:00","close":"..","volume":"股","amount":"元"}]`
+    /// 只保留最新交易日;均价为累计成交额 / 累计成交量;新浪不提供昨收,先用首根开盘价占位(由行情昨收覆盖)。
+    static func parseAShareMinute(_ data: Data, symbol: StockSymbol) throws -> MinuteSeries {
+        guard let text = String(data: data, encoding: .utf8) ?? TextCodec.decodeGBK(data),
+              let open = text.range(of: "var t=("), let close = text.lastIndex(of: ")") else {
+            throw ProviderError.invalidData("分时结构")
+        }
+        let json = String(text[open.upperBound..<close])
+        guard let rows = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [[String: String]], !rows.isEmpty else {
+            throw ProviderError.invalidData("分时为空")
+        }
+        guard let lastDay = rows.last?["day"].map({ String($0.prefix(10)) }) else { throw ProviderError.invalidData("分时时间") }
+        let isIndex = symbol.kind == .index
+        var bars: [MinuteBar] = []
+        var cumVolume = 0.0
+        var cumAmount = 0.0
+        var firstOpen: Double?
+        for row in rows {
+            guard let day = row["day"], day.hasPrefix(lastDay), day.count >= 16,
+                  let price = Double(row["close"] ?? ""), price > 0 else { continue }
+            let hm = day.dropFirst(11).prefix(5).split(separator: ":").compactMap { Int($0) }
+            guard hm.count == 2, let idx = MinuteBar.index(hour: hm[0], minute: hm[1]) else { continue }
+            if firstOpen == nil { firstOpen = Double(row["open"] ?? "") }
+            let shares = Double(row["volume"] ?? "") ?? 0
+            let amount = Double(row["amount"] ?? "") ?? 0
+            cumVolume += shares
+            cumAmount += amount
+            let avg: Double? = (!isIndex && cumVolume > 0) ? cumAmount / cumVolume : nil
+            if let last = bars.last, last.index == idx { bars.removeLast() }
+            bars.append(MinuteBar(index: idx, price: price, volume: isIndex ? shares : shares / 100, avgPrice: avg))
+        }
+        guard !bars.isEmpty else { throw ProviderError.invalidData("分时为空") }
+        return MinuteSeries(symbol: symbol, prevClose: firstOpen ?? bars[0].price,
+                            date: lastDay.replacingOccurrences(of: "-", with: ""), bars: bars, source: .sina)
     }
 }

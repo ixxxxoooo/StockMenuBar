@@ -12,6 +12,8 @@ struct StockDetailView: View {
     let item: WatchItem
     private let env = AppEnvironment.shared
     @State private var loader = MinuteLoader(store: AppEnvironment.shared.quotes)
+    /// 手动重试计数:变化时重启分时加载任务
+    @State private var retryToken = 0
 
     var body: some View {
         let ticker = env.quotes.ticker(for: item.symbol)
@@ -28,10 +30,15 @@ struct StockDetailView: View {
                             Spacer()
                             legend
                         }
-                        MinuteChartView(series: loader.series, isLoading: loader.isLoading, failed: loader.failed)
+                        MinuteChartView(series: loader.series, isLoading: loader.isLoading, failed: loader.failed) {
+                            retryToken += 1
+                        }
                     }
                     .frame(maxWidth: .infinity)
-                    if item.symbol.isFuture {
+                    if item.symbol.kind == .index {
+                        IndexInfoView(symbol: item.symbol, quote: quote, series: loader.series)
+                            .frame(width: 236)
+                    } else if item.symbol.isFuture {
                         FuturesInfoView(symbol: item.symbol, quote: quote, series: loader.series)
                             .frame(width: 236)
                     } else {
@@ -42,7 +49,7 @@ struct StockDetailView: View {
             }
             .padding(24)
         }
-        .task(id: item.symbol) {
+        .task(id: "\(item.symbol.full)#\(retryToken)") {
             await loader.run(symbol: item.symbol, tradingInterval: 10)
         }
     }
@@ -118,28 +125,35 @@ struct StockDetailView: View {
 
     // MARK: - 统计
 
+    /// 统计格:只展示有数据的字段(指数无成交量/换手率、期货无换手率时直接隐藏,不显示 --)
     private func statsGrid(_ quote: Quote?) -> some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
+        let isFuture = item.symbol.kind == .future
+        let prevTitle = isFuture ? "昨结" : "昨收"
         return LazyVGrid(columns: columns, spacing: 12) {
             if let q = quote {
-                stat("今开", Fmt.price(q.open, decimals: q.decimals), reference: q)
-                stat(q.symbol.isFuture ? "昨结" : "昨收", Fmt.price(q.prevClose, decimals: q.decimals), reference: nil)
+                if q.open > 0 { stat("今开", Fmt.price(q.open, decimals: q.decimals), reference: q) }
+                stat(prevTitle, Fmt.price(q.prevClose, decimals: q.decimals), reference: nil)
                 stat("最高", Fmt.price(q.high, decimals: q.decimals), reference: q, value: q.high)
                 stat("最低", Fmt.price(q.low, decimals: q.decimals), reference: q, value: q.low)
-                // 全球指数没有成交量/额数据,显示 --
-                let noVolume = q.symbol.isFuture && q.symbol.kind == .index
-                stat("成交量", noVolume ? "--" : Fmt.volume(q.volume), reference: nil)
-                stat("成交额", noVolume || q.amount <= 0 ? "--" : Fmt.amount(q.amount), reference: nil)
-                if q.symbol.isFuture {
-                    stat("持仓量", q.openInterest.map(Fmt.volume) ?? "--", reference: nil)
-                } else {
-                    stat("换手率", q.turnover.map(Fmt.plainPercent) ?? "--", reference: nil)
+                if q.volume > 0 { stat("成交量", volumeText(q), reference: nil) }
+                if q.amount > 0 { stat("成交额", Fmt.amount(q.amount), reference: nil) }
+                if isFuture, let oi = q.openInterest, oi > 0 { stat("持仓量", Fmt.volume(oi), reference: nil) }
+                if !isFuture, let turnover = q.turnover { stat("换手率", Fmt.plainPercent(turnover), reference: nil) }
+                if q.prevClose > 0, q.high > q.low {
+                    stat("振幅", Fmt.plainPercent((q.high - q.low) / q.prevClose * 100), reference: nil)
                 }
-                stat("振幅", q.prevClose > 0 ? Fmt.plainPercent((q.high - q.low) / q.prevClose * 100) : "--", reference: nil)
             } else {
-                ForEach(["今开", item.symbol.isFuture ? "昨结" : "昨收", "最高", "最低", "成交量", "成交额", item.symbol.isFuture ? "持仓量" : "换手率", "振幅"], id: \.self) { stat($0, "--", reference: nil) }
+                ForEach(["今开", prevTitle, "最高", "最低"], id: \.self) { stat($0, "--", reference: nil) }
             }
         }
+    }
+
+    /// 成交量文本:全球指数(美股指数等)以股计,其余以手计
+    private func volumeText(_ q: Quote) -> String {
+        guard q.symbol.isFuture, q.symbol.kind == .index else { return Fmt.volume(q.volume) }
+        return q.volume >= 100_000_000 ? String(format: "%.2f亿股", q.volume / 100_000_000)
+            : (q.volume >= 10_000 ? String(format: "%.2f万股", q.volume / 10_000) : String(format: "%.0f股", q.volume))
     }
 
     /// 单个统计格;传入 reference 时按相对昨收着色
@@ -164,7 +178,7 @@ struct StockDetailView: View {
         HStack(spacing: 10) {
             legendItem("分时", color: Theme.color(.up, redUp: env.prefs.redUp))
             legendItem("均价", color: .orange)
-            legendItem(item.symbol.isFuture ? "昨结" : "昨收", color: .secondary)
+            legendItem(item.symbol.kind == .future ? "昨结" : "昨收", color: .secondary)
         }
         .font(.system(size: 10))
         .foregroundStyle(.secondary)
@@ -198,7 +212,7 @@ struct FuturesInfoView: View {
                 info("交易所", symbol.marketTag)
                 info("合约", symbol.displayCode)
                 info("昨结算", quote.map { Fmt.price($0.prevClose, decimals: $0.decimals) } ?? "--")
-                info("持仓量", quote?.openInterest.map(Fmt.volume) ?? "--")
+                if let oi = quote?.openInterest, oi > 0 { info("持仓量", Fmt.volume(oi)) }
             }
             if let series {
                 Divider()
@@ -219,7 +233,7 @@ struct FuturesInfoView: View {
     private var note: String {
         symbol.kind == .index
             ? "涨跌幅按前收盘价计算。"
-            : "涨跌幅按昨结算价计算;成交量、持仓量单位为手。免费数据源不提供期货五档盘口。"
+            : "涨跌幅按昨结算价计算;没有数据的字段已隐藏。免费数据源不提供期货五档盘口。"
     }
 
     private func info(_ title: String, _ value: String) -> some View {

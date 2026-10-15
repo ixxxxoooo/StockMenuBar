@@ -42,6 +42,8 @@ struct MinuteChartView: View {
     let series: MinuteSeries?
     let isLoading: Bool
     let failed: Bool
+    /// 加载失败时的手动重试(为空则不显示按钮)
+    var retry: (() -> Void)?
     @State private var hoverIndex: Int?
     private let prefs = AppEnvironment.shared.prefs
 
@@ -54,8 +56,11 @@ struct MinuteChartView: View {
             VStack(spacing: 4) {
                 priceChart(series)
                     .frame(minHeight: 260)
-                volumeChart(series)
-                    .frame(height: 92)
+                // 没有成交量数据(部分指数/外盘源)时隐藏量能图,避免一块空白
+                if series.bars.contains(where: { $0.volume > 0 }) {
+                    volumeChart(series)
+                        .frame(height: 92)
+                }
             }
         } else {
             ZStack {
@@ -63,8 +68,13 @@ struct MinuteChartView: View {
                 if isLoading {
                     ProgressView()
                 } else {
-                    Label(failed ? "分时数据加载失败" : "暂无分时数据", systemImage: "chart.xyaxis.line")
-                        .foregroundStyle(.secondary)
+                    VStack(spacing: 10) {
+                        Label(failed ? "分时数据加载失败,正在自动重试…" : "暂无分时数据", systemImage: "chart.xyaxis.line")
+                            .foregroundStyle(.secondary)
+                        if failed, let retry {
+                            Button("立即重试", action: retry).controlSize(.small)
+                        }
+                    }
                 }
             }
             .frame(height: 360)

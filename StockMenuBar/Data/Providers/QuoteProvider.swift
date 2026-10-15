@@ -10,13 +10,14 @@ import Foundation
 
 /// 数据源标识
 enum ProviderID: String, Sendable, CaseIterable, Hashable {
-    case tencent, sina, eastmoney
+    case tencent, sina, eastmoney, yahoo
 
     var displayName: String {
         switch self {
         case .tencent: return "腾讯"
         case .sina: return "新浪"
         case .eastmoney: return "东财"
+        case .yahoo: return "雅虎"
         }
     }
 }

@@ -70,54 +70,39 @@ struct MainView: View {
                     }
                 }
             }
-            Section {
-                Label("偏好设置", systemImage: "gearshape").tag(MainSelection.settings)
-            }
         }
         .listStyle(.sidebar)
-        // 过滤框与操作按钮放在侧栏内部(而不是 .searchable / .toolbar):
-        // 避免折叠/展开侧栏时系统把工具栏项在侧栏与标题栏之间迁移,造成卡顿闪烁
-        .safeAreaInset(edge: .top, spacing: 0) { filterBar }
-        .safeAreaInset(edge: .bottom, spacing: 0) { sidebarActions }
-    }
-
-    /// 侧栏顶部过滤框(支持名称/代码/拼音首字母)
-    private var filterBar: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(.secondary)
-            TextField("过滤:名称 / 代码 / 拼音", text: $filter)
-                .textFieldStyle(.plain)
-                .font(.system(size: 12.5))
-            if !filter.isEmpty {
-                Button { filter = "" } label: { Image(systemName: "xmark.circle.fill") }
-                    .buttonStyle(.plain).foregroundStyle(.tertiary)
+        // 与系统「邮件/备忘录」一致的原生侧栏:顶部过滤框走 .searchable,添加/管理按钮走窗口工具栏,
+        // 左下角仅保留一个设置图标(⌘, 同样可打开),整个左侧是一个整体
+        .searchable(text: $filter, placement: .sidebar, prompt: "过滤:名称 / 代码 / 拼音")
+        .toolbar {
+            ToolbarItemGroup {
+                Button { showAdd = true } label: { Image(systemName: "plus") }
+                    .help("搜索并添加自选")
+                    .popover(isPresented: $showAdd, arrowEdge: .bottom) { AddStockView() }
+                Button { showGroupManager = true } label: { Image(systemName: "folder.badge.gearshape") }
+                    .help("管理分组")
             }
         }
-        .padding(.horizontal, 8)
-        .frame(height: 26)
-        .background(.quaternary.opacity(0.7), in: RoundedRectangle(cornerRadius: 7))
-        .padding(.horizontal, 10)
-        .padding(.top, 6)
-        .padding(.bottom, 6)
-        .frame(maxWidth: .infinity)
-        .background(.bar)
+        // 列表底部留出空间,最后几行可以滚动到设置图标上方
+        .contentMargins(.bottom, 38, for: .scrollContent)
+        .overlay(alignment: .bottomLeading) { settingsButton }
     }
 
-    /// 侧栏底部操作:添加自选、管理分组
-    private var sidebarActions: some View {
-        HStack(spacing: 4) {
-            Button { showAdd = true } label: { Label("添加自选", systemImage: "plus") }
-                .help("搜索并添加自选")
-                .popover(isPresented: $showAdd, arrowEdge: .top) { AddStockView() }
-            Spacer()
-            Button { showGroupManager = true } label: { Image(systemName: "folder.badge.gearshape") }
-                .help("管理分组")
+    /// 侧栏左下角的设置图标:悬浮的圆形小按钮,不占独立的一行
+    private var settingsButton: some View {
+        Button { nav.selection = .settings } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 14))
+                .foregroundStyle(nav.selection == .settings ? Color.accentColor : Color.secondary)
+                .frame(width: 28, height: 28)
+                .background(.regularMaterial, in: Circle())
+                .contentShape(Circle())
         }
-        .buttonStyle(.borderless)
-        .font(.system(size: 12))
-        .padding(.horizontal, 12)
-        .frame(height: 34)
-        .background(.bar)
+        .buttonStyle(.plain)
+        .help("偏好设置 (⌘,)")
+        .padding(.leading, 10)
+        .padding(.bottom, 8)
     }
 
     private func groupHeader(_ group: WatchGroup) -> some View {
@@ -146,6 +131,12 @@ struct MainView: View {
             env.consumersChanged()
         }
         Button(prefs.isInFloating(item.symbol) ? "移出悬浮窗" : "加入悬浮窗") { prefs.toggleFloating(item.symbol) }
+        if let index = group.items.firstIndex(where: { $0.id == item.id }) {
+            Button("置顶") { env.watchlist.moveItems(in: group.id, from: IndexSet(integer: index), to: 0) }
+                .disabled(index == 0)
+            Button("移到末尾") { env.watchlist.moveItems(in: group.id, from: IndexSet(integer: index), to: group.items.count) }
+                .disabled(index == group.items.count - 1)
+        }
         Menu("移动到分组") {
             ForEach(env.watchlist.groups.filter { $0.id != group.id }) { target in
                 Button(target.name) { env.watchlist.moveItem(itemID: item.id, toGroup: target.id) }
