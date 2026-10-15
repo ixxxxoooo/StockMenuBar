@@ -1,0 +1,71 @@
+name: StockMenuBar
+options:
+  bundleIdPrefix: com.ixxxxoooo
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "14.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "-"
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_STRICT_CONCURRENCY: complete
+targets:
+  StockMenuBar:
+    type: application
+    platform: macOS
+    sources:
+      - path: StockMenuBar
+        excludes:
+          - Info.plist
+          - StockMenuBar.entitlements
+    info:
+      path: StockMenuBar/Info.plist
+      properties:
+        CFBundleName: StockMenuBar
+        CFBundleDisplayName: StockMenuBar
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "1"
+        LSUIElement: true
+        LSMinimumSystemVersion: "14.0"
+        LSApplicationCategoryType: public.app-category.finance
+        NSHumanReadableCopyright: "Copyright © 2026 ixxxxoooo. 行情数据来自公开接口,仅供个人参考,不构成投资建议。"
+    entitlements:
+      path: StockMenuBar/StockMenuBar.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ixxxxoooo.StockMenuBar
+        PRODUCT_NAME: StockMenuBar
+        ENABLE_HARDENED_RUNTIME: NO
+        COMBINE_HIDPI_IMAGES: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+  StockMenuBarTests:
+    type: bundle.unit-test
+    platform: macOS
+    # 逻辑层(Core/Data/Shared)直接编入测试包,无需宿主应用,避免启动菜单栏界面
+    sources:
+      - StockMenuBarTests
+      - StockMenuBar/Core
+      - StockMenuBar/Data
+      - StockMenuBar/Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.ixxxxoooo.StockMenuBarTests
+        GENERATE_INFOPLIST_FILE: YES
+        ENABLE_HARDENED_RUNTIME: NO
+schemes:
+  StockMenuBar:
+    build:
+      targets:
+        StockMenuBar: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - StockMenuBarTests
