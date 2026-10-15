@@ -2,6 +2,18 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/),格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [1.2.0] - 2026-10-16
+
+### 新增
+- **在线更新**:自动(启动后与每 6 小时)或手动检查 GitHub 最新发布;发现新版本后一键下载、校验 SHA-256 与代码签名、就地替换并自动重启,失败自动回滚。入口:偏好设置 → 软件更新、应用菜单与菜单栏右键「检查更新…」,侧栏设置图标有新版本红点。
+- 检测双通道:优先 GitHub API,被限流时回退到 `releases/latest` 网页重定向。
+- **自动发版**:推送 `v*` 标签后由 GitHub Actions 构建通用二进制(arm64 + x86_64),打包 zip 与 sha256 并发布到 Release,更新说明取自本文件。
+- `scripts/package.sh`:本地与 CI 共用的打包脚本。
+
+### 变更
+- 应用**不再启用 App Sandbox**:沙盒应用无法替换自身所在的 .app,在线更新必须如此。应用仍只访问网络与自己的数据目录,自选数据库迁移到 `~/Library/Application Support/StockMenuBar/Watchlist.store`(升级后需重新设置自选)。
+- 版本号改由 `project.yml` 中的 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` 统一管理。
+
 ## [1.1.0] - 2026-10-16
 
 ### 新增

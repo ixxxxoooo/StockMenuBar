@@ -92,6 +92,8 @@ struct SettingsView: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
 
+            updateSection
+
             aboutSection
         }
         .formStyle(.grouped)
@@ -101,6 +103,89 @@ struct SettingsView: View {
                 statuses = await env.router.statuses()
                 try? await Task.sleep(for: .seconds(2))
             }
+        }
+    }
+
+    /// 软件更新:检查 GitHub 新版本,一键下载、校验、替换并重启
+    private var updateSection: some View {
+        let updates = env.updates
+        return Section("软件更新") {
+            LabeledContent("当前版本") { Text(AppInfo.version).foregroundStyle(.secondary) }
+            Toggle("自动检查更新", isOn: Binding(get: { env.prefs.autoCheckUpdates }, set: { env.prefs.autoCheckUpdates = $0 }))
+
+            switch updates.state {
+            case .idle:
+                updateButtonRow(title: "检查更新", detail: lastCheckText)
+            case .checking:
+                LabeledContent("状态") {
+                    HStack(spacing: 8) { ProgressView().controlSize(.small); Text("正在检查…").foregroundStyle(.secondary) }
+                }
+            case .upToDate:
+                updateButtonRow(title: "再次检查", detail: "已是最新版本" + (lastCheckText.map { "(\($0))" } ?? ""))
+            case .available(let release):
+                availableRows(release)
+            case .downloading(let release, let progress):
+                LabeledContent("正在下载 \(release.version)") {
+                    HStack(spacing: 8) {
+                        ProgressView(value: progress).frame(width: 140)
+                        Text("\(Int(progress * 100))%").monospacedDigit().foregroundStyle(.secondary)
+                    }
+                }
+            case .verifying(let release):
+                LabeledContent("正在校验 \(release.version)") { ProgressView().controlSize(.small) }
+            case .installing(let release):
+                LabeledContent("正在安装 \(release.version)") {
+                    HStack(spacing: 8) { ProgressView().controlSize(.small); Text("应用即将重启…").foregroundStyle(.secondary) }
+                }
+            case .failed(let message):
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(message).foregroundStyle(.red).font(.callout).fixedSize(horizontal: false, vertical: true)
+                    HStack {
+                        if let url = updates.manualInstallURL {
+                            Button("在 Finder 中显示新版本") { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                        }
+                        Button("重试") { Task { await updates.check(userInitiated: true) } }
+                        Link("手动下载", destination: AppInfo.repositoryURL.appendingPathComponent("releases/latest"))
+                    }
+                }
+            }
+
+            Text("更新包来自项目的 GitHub Release,下载后会校验 SHA-256 与代码签名,通过后替换当前应用并自动重启。")
+                .font(.footnote).foregroundStyle(.secondary)
+        }
+    }
+
+    private var lastCheckText: String? {
+        guard let date = env.prefs.lastUpdateCheck else { return nil }
+        return "上次检查 " + date.formatted(date: .abbreviated, time: .shortened)
+    }
+
+    private func updateButtonRow(title: String, detail: String?) -> some View {
+        LabeledContent {
+            Button(title) { Task { await env.updates.check(userInitiated: true) } }
+        } label: {
+            Text(detail ?? "尚未检查").foregroundStyle(.secondary)
+        }
+    }
+
+    /// 发现新版本:展示版本号、更新说明与操作按钮
+    @ViewBuilder
+    private func availableRows(_ release: ReleaseInfo) -> some View {
+        LabeledContent("发现新版本") {
+            Text("\(release.version)").bold().foregroundStyle(Color.accentColor)
+        }
+        if !release.notes.isEmpty {
+            ScrollView {
+                Text(release.notes).font(.footnote).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading).textSelection(.enabled)
+            }
+            .frame(maxHeight: 120)
+        }
+        HStack {
+            Button("立即更新并重启") { env.updates.installAvailableUpdate() }
+                .buttonStyle(.borderedProminent)
+            Button("跳过此版本") { env.updates.skipAvailableVersion() }
+            Link("查看发布页", destination: release.pageURL)
         }
     }
 

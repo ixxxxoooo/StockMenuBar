@@ -29,6 +29,28 @@ xcodebuild test -scheme StockMenuBar -destination 'platform=macOS' -derivedDataP
 4. 补充解析、映射、路由兜底的单元测试;网络用例放在 `LiveProviderTests`(默认跳过)。
 5. 更新 `docs/DATA_SOURCES.md` 与 `CHANGELOG.md`。
 
+## 发布新版本
+
+版本号只在 `project.yml` 的 `MARKETING_VERSION` / `CURRENT_PROJECT_VERSION` 维护,**应用内在线更新依赖 Release 的资产命名,请勿改动**:`StockMenuBar-<版本>-macOS.zip` 与同名 `.sha256`。
+
+1. 更新 `project.yml` 的版本号,并在 `CHANGELOG.md` 顶部新增 `## [x.y.z] - 日期` 小节(它会成为 Release 说明)。
+2. 合并到 `main` 并确认 CI 通过。
+3. 打标签并推送:`git tag v1.2.0 && git push origin v1.2.0`。
+4. [Release 工作流](.github/workflows/release.yml)会自动测试、构建通用二进制、打包、校验并发布 Release;带连字符的标签(如 `v1.3.0-beta.1`)会标记为预发布,在线更新不会推送预发布版本。
+5. 本地预演打包:`scripts/package.sh 1.2.0 1`,产物在 `dist/`。
+
+### 在线更新的本地测试
+
+```bash
+# 1. 用 scripts/package.sh 分别打出旧版与新版,旧版解压到临时目录
+# 2. 在新版 zip 所在目录放一个仿 GitHub API 的 latest.json(字段见 StockMenuBarTests/Fixtures/github_release_latest.json),
+#    browser_download_url 指向本地 http.server
+# 3. 让旧版指向它并立即更新
+STOCKMENUBAR_UPDATE_API=http://127.0.0.1:8765/latest.json \
+  /tmp/old/StockMenuBar.app/Contents/MacOS/StockMenuBar --update-now
+tail -f ~/Library/Logs/StockMenuBar/update.log
+```
+
 ## 提交规范
 
 使用 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/),中文描述:

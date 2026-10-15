@@ -20,27 +20,23 @@ targets:
       - path: StockMenuBar
         excludes:
           - Info.plist
-          - StockMenuBar.entitlements
     info:
       path: StockMenuBar/Info.plist
       properties:
         CFBundleName: StockMenuBar
         CFBundleDisplayName: StockMenuBar
-        CFBundleShortVersionString: "1.1.0"
-        CFBundleVersion: "2"
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSUIElement: true
         LSMinimumSystemVersion: "14.0"
         LSApplicationCategoryType: public.app-category.finance
         NSHumanReadableCopyright: "Copyright © 2026 ixxxxoooo. 行情数据来自公开接口,仅供个人参考,不构成投资建议。"
-    entitlements:
-      path: StockMenuBar/StockMenuBar.entitlements
-      properties:
-        com.apple.security.app-sandbox: true
-        com.apple.security.network.client: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ixxxxoooo.StockMenuBar
         PRODUCT_NAME: StockMenuBar
+        MARKETING_VERSION: "1.2.0"
+        CURRENT_PROJECT_VERSION: "3"
         ENABLE_HARDENED_RUNTIME: NO
         COMBINE_HIDPI_IMAGES: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

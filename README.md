@@ -9,6 +9,7 @@
 菜单栏常驻 · Popover 速览 · 主面板深度查看 · 悬浮迷你窗 · 多数据源高可用自动切换
 
 [![CI](https://github.com/ixxxxoooo/StockMenuBar/actions/workflows/ci.yml/badge.svg)](https://github.com/ixxxxoooo/StockMenuBar/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/ixxxxoooo/StockMenuBar)](https://github.com/ixxxxoooo/StockMenuBar/releases/latest)
 ![Platform](https://img.shields.io/badge/macOS-14%2B-blue)
 ![Swift](https://img.shields.io/badge/Swift-6-orange)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -31,6 +32,7 @@
 - **自选管理**:分组、拖拽自定义排序、拼音首字母 / 中文 / 代码搜索、右键置顶 / 固定到菜单栏 / 加入悬浮窗。
 - **智能刷新**:交易时段 3 / 5 / 10 秒,午休 1 分钟,休市不轮询;睡眠、锁屏、屏保自动暂停;期货与外盘按各自开市窗口轮询。
 - **体验细节**:红涨绿跌(可反转)、价格闪色、深浅色、Dock 图标随主面板显示、⌥⌘F / ⌥⌘L / ⌥⌘H 全局快捷键(悬浮窗 / 穿透 / 老板键)、⌘, 打开偏好设置。
+- **在线更新**:自动检查 GitHub 新版本,一键下载、校验并替换重启(见下文)。
 - **零依赖**:Swift 6 严格并发 + SwiftUI + AppKit + Swift Charts + SwiftData。
 
 | 全球指数 | 贵金属 | 悬浮迷你窗 |
@@ -49,7 +51,22 @@
 
 实际顺序由路由根据实时健康度动态决定,上表只是能力矩阵。字段映射与实测结论见 [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md)。
 
-## 安装与运行
+## 安装
+
+从 [Releases](https://github.com/ixxxxoooo/StockMenuBar/releases/latest) 下载 `StockMenuBar-<版本>-macOS.zip`(通用二进制,支持 Apple 芯片与 Intel),解压后把 `StockMenuBar.app` 拖进「应用程序」。
+
+> 应用使用 ad-hoc 签名、未经过 Apple 公证。首次打开如果被 Gatekeeper 拦截,请右键 → 打开,或在「系统设置 → 隐私与安全性」中点「仍要打开」;也可以执行 `xattr -dr com.apple.quarantine /Applications/StockMenuBar.app`。
+> 校验下载文件:`shasum -a 256 -c StockMenuBar-<版本>-macOS.zip.sha256`。
+
+### 在线更新
+
+- 启动后以及每 6 小时自动检查 GitHub 最新正式版;也可以在 **偏好设置 → 软件更新**、应用菜单或菜单栏右键里点「检查更新…」。有新版本时侧栏设置图标会出现红点。
+- 点「立即更新并重启」后:下载安装包 → 校验 SHA-256 → 解压并校验 Bundle ID、版本号与代码签名 → 退出当前应用 → 原子替换 `.app` → 自动重新打开。任一步失败都保持旧版本不变(替换失败会回滚)。
+- 检测优先走 GitHub API,被限流时回退到 `releases/latest` 网页重定向。
+- 说明:原生 Swift 应用无法像脚本语言那样"热补丁"正在运行的代码,这里的"热更新"是指**无需手动操作的下载 + 替换 + 自动重启**,通常几秒内完成。
+- 如果应用不在可写目录(例如从只读磁盘映像里运行),会改为提示在 Finder 中手动替换。更新日志位于 `~/Library/Logs/StockMenuBar/update.log`。
+
+## 从源码构建
 
 ### 环境要求
 
@@ -67,7 +84,9 @@ xcodebuild -scheme StockMenuBar -configuration Release -derivedDataPath build bu
 open build/Build/Products/Release/StockMenuBar.app
 ```
 
-也可以 `open StockMenuBar.xcodeproj` 后在 Xcode 里直接运行。应用使用 ad-hoc 签名并启用沙盒(仅 `network.client`),首次打开若被 Gatekeeper 拦截,请在「系统设置 → 隐私与安全性」中允许。
+也可以 `open StockMenuBar.xcodeproj` 后在 Xcode 里直接运行。
+
+> 应用**不启用 App Sandbox**:沙盒应用无法替换自身所在的 `.app`,而在线更新需要这一能力。应用只访问网络,数据保存在 `~/Library/Application Support/StockMenuBar/` 与 `UserDefaults`。
 
 ### 测试
 
@@ -79,7 +98,7 @@ TEST_RUNNER_LIVE_TESTS=1 xcodebuild test -scheme StockMenuBar -destination 'plat
 
 ### 调试启动参数
 
-`--show-main` `--show-settings` `--show-popover` `--show-floating` `--pin=sh000001,sz399001` `--fail-source=tencent,sina`(让指定数据源恒定失败,用于验证故障转移)。
+`--show-main` `--show-settings` `--show-popover` `--show-floating` `--pin=sh000001,sz399001` `--fail-source=tencent,sina`(让指定数据源恒定失败,用于验证故障转移)、`--update-now`(启动后立即检查并安装更新,配合环境变量 `STOCKMENUBAR_UPDATE_API` 指向自建的 latest JSON,用于测试更新流程)。
 
 ## 项目结构
 
@@ -104,7 +123,12 @@ docs/               架构与数据源文档
 
 - **数据延迟或缺失?** 行情来自公开免费接口,可能有数秒到数分钟延迟;某个数据源被限流时会自动切到其余数据源,可在「偏好设置 → 行情数据源」查看各源状态。
 - **韩国指数没有成交量?** 这些指数的免费数据源不提供成交量,界面会隐藏没有数据的字段。
-- **升级后自选没了?** 1.1.0 起 Bundle ID 改为 `com.ixxxxoooo.StockMenuBar`,数据存放在新的沙盒容器中。
+- **升级后自选没了?** 1.1.0 起 Bundle ID 改为 `com.ixxxxoooo.StockMenuBar`;1.2.0 起不再启用沙盒,数据库移到 `~/Library/Application Support/StockMenuBar/`。这两次变更都不会迁移旧数据,此后在线更新不会影响数据。
+- **更新提示「没有权限」?** 应用所在目录不可写时无法自动替换,请把应用放进「应用程序」后重试,或按提示手动替换。
+
+## 发布流程
+
+推送形如 `v1.2.0` 的标签即可发版,[Release 工作流](.github/workflows/release.yml)会自动运行测试、构建通用二进制、打包 zip 与 sha256,并发布到 GitHub Release(更新说明取自 `CHANGELOG.md`)。详见 [CONTRIBUTING.md](CONTRIBUTING.md#发布新版本)。
 
 ## 参与贡献
 

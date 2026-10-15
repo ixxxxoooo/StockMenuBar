@@ -36,10 +36,21 @@ final class WatchlistStore {
         groups.first(where: { $0.id == selectedGroupID }) ?? groups.first
     }
 
+    /// 自选数据库位置:~/Library/Application Support/StockMenuBar/Watchlist.store
+    /// (应用不再启用沙盒以支持在线更新,必须显式指定目录,避免与其他应用共用 default.store)
+    static func storeURL() -> URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("StockMenuBar", isDirectory: true)
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        return base.appendingPathComponent("Watchlist.store")
+    }
+
     /// - Parameter inMemory: 为 true 时使用内存存储(测试)
     init(inMemory: Bool = false) {
         let schema = Schema([GroupEntity.self, ItemEntity.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: inMemory)
+        let config = inMemory
+            ? ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            : ModelConfiguration(schema: schema, url: Self.storeURL())
         if let c = try? ModelContainer(for: schema, configurations: [config]) {
             container = c
         } else {

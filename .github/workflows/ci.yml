@@ -21,3 +21,13 @@ jobs:
             -destination 'platform=macOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO
+
+  # 预演打包,避免发版时才发现打包脚本损坏
+  package:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 XcodeGen
+        run: brew install xcodegen
+      - name: 打包预演
+        run: scripts/package.sh 0.0.0-ci 1

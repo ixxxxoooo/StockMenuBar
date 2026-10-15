@@ -39,6 +39,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         registerHotKeys()
         env.scheduler.start()
+        env.updates.terminate = { NSApp.terminate(nil) }
+        env.updates.startAutoCheck()
         handleLaunchArguments()
     }
 
@@ -51,11 +53,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             env.prefs.pinnedSymbols = pin.dropFirst(6).split(separator: ",").map(String.init)
         }
         if args.contains("--show-floating") { env.prefs.floatingVisible = true }
+        if args.contains("--update-now") { runUpdateNow() }
         if args.contains("--show-popover") {
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(800))
                 self?.statusController?.togglePopover()
             }
+        }
+    }
+
+    /// 调试/自动化测试:启动后立即检查,发现新版本就下载、安装并重启(--update-now)
+    private func runUpdateNow() {
+        mainWindow.show(settings: true)
+        Task { @MainActor [weak self] in
+            guard let updates = self?.env.updates else { return }
+            await updates.check(userInitiated: true)
+            updates.installAvailableUpdate()
         }
     }
 
@@ -103,6 +116,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         mainWindow.show(settings: true)
     }
 
+    /// 菜单「检查更新…」
+    @objc private func checkForUpdates() { env.checkForUpdates() }
+
     // MARK: - 主菜单(accessory 应用没有菜单栏,但需要 Edit 菜单让 ⌘C/⌘V/⌘A 在搜索框中可用)
 
     private func installMainMenu() {
@@ -113,6 +129,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let prefs = NSMenuItem(title: "偏好设置…", action: #selector(openPreferences), keyEquivalent: ",")
         prefs.target = self
         appMenu.addItem(prefs)
+        let update = NSMenuItem(title: "检查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
+        update.target = self
+        appMenu.addItem(update)
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "退出 StockMenuBar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu

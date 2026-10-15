@@ -145,6 +145,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         menu.addItem(floating)
         menu.addItem(item("立即刷新", #selector(refreshNow)))
         menu.addItem(item("偏好设置…", #selector(openSettings)))
+        menu.addItem(item(env.updateMenuTitle, #selector(checkUpdates)))
         menu.addItem(.separator())
         menu.addItem(item("退出 StockMenuBar", #selector(quit)))
         statusItem.menu = menu
@@ -160,6 +161,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
 
     @objc private func openMain() { env.openMainWindow?(false) }
     @objc private func openSettings() { env.openMainWindow?(true) }
+    @objc private func checkUpdates() { env.checkForUpdates() }
     @objc private func toggleFloating() { env.toggleFloatingWindow?() }
     @objc private func refreshNow() { env.scheduler.refreshOnDemand() }
     @objc private func quit() { NSApp.terminate(nil) }

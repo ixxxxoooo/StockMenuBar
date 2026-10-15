@@ -1,0 +1,58 @@
+name: Release
+
+# 推送形如 v1.2.0 的标签时:测试 → 构建通用二进制 → 打包 → 发布到 GitHub Release
+# 应用内「在线更新」读取的就是这里发布的 StockMenuBar-<版本>-macOS.zip 与 .sha256
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 解析版本号
+        id: version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "标签 $GITHUB_REF_NAME 不是合法的语义化版本" >&2; exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *-* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+
+      - name: 安装 XcodeGen
+        run: brew install xcodegen
+
+      - name: 运行测试
+        run: |
+          xcodegen generate
+          xcodebuild test -scheme StockMenuBar -destination 'platform=macOS' -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+
+      - name: 构建并打包
+        run: scripts/package.sh "${{ steps.version.outputs.version }}" "${{ github.run_number }}"
+
+      - name: 校验产物
+        run: |
+          cd dist
+          shasum -a 256 -c *.sha256
+          unzip -q *.zip -d verify
+          codesign --verify --deep --strict verify/StockMenuBar.app
+          lipo -archs verify/StockMenuBar.app/Contents/MacOS/StockMenuBar
+
+      - name: 生成更新说明
+        run: scripts/release_notes.sh "${{ steps.version.outputs.version }}" > RELEASE_NOTES.md
+
+      - name: 发布 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FLAGS=""
+          if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then FLAGS="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/*.sha256 \
+            --title "StockMenuBar ${{ steps.version.outputs.version }}" \
+            --notes-file RELEASE_NOTES.md $FLAGS --verify-tag

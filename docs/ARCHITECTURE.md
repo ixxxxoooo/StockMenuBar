@@ -52,3 +52,19 @@ RefreshScheduler(交易时段 / 电源状态 / 期货窗口) 驱动 QuoteStore �
 - 一次批量请求同时驱动所有界面;每只证券一个 `QuoteTicker`,行情变化只重绘对应行。
 - 交易时段按用户间隔轮询,午休 1 分钟,休市不轮询;含期货 / 外盘时按各自窗口(周一 06:00 – 周六 05:00)至少 5 秒轮询。
 - 睡眠、锁屏、屏保、全部界面隐藏时暂停;低电量 / 高热时间隔翻倍。
+
+## 在线更新(`Core/Update`)
+
+```
+UpdateManager(@Observable 状态机)
+ ├─ UpdateChecker   GitHub API → 失败回退 releases/latest 网页重定向 → ReleaseInfo
+ ├─ UpdateInstaller 流式下载 + SHA-256 → ditto 解压 → 校验 Bundle ID/版本/codesign → 安装脚本
+ └─ SemanticVersion 语义化版本比较(预发布 < 正式版)
+```
+
+- **发布约定**:Release 必须带 `StockMenuBar-<版本>-macOS.zip`;校验值优先取 API 的 `digest`,否则读同名 `.sha256`;都没有就拒绝安装。
+- **为什么不用沙盒**:沙盒应用无法写入自己所在的 `.app`。应用只访问网络与自己的数据目录;自选数据库显式放在 `~/Library/Application Support/StockMenuBar/Watchlist.store`。
+- **替换流程**:应用写出 `install.sh` 并启动后退出;脚本等待旧进程退出 → `ditto` 复制到同目录 `*.updating` → 去除隔离属性 → `mv` 旧版为 `*.old` → `mv` 新版就位 → 删除 `*.old` → `open`。复制或改名失败时回滚旧版并重新打开。所有路径以位置参数传入,不拼接进脚本。
+- **拦截条件**:位于 `AppTranslocation`(从下载目录直接运行)或父目录不可写时,不自动替换,改为展示"在 Finder 中显示新版本"。
+- **测试**:`UpdateTests` 覆盖版本比较、JSON 解析、双通道检测、下载校验(含篡改)、解压校验(含签名破坏)、安装脚本替换与回滚、状态机;`--update-now` + `STOCKMENUBAR_UPDATE_API` 用于端到端演练。
+- **信任模型**:HTTPS + 仓库所有者的 Release 为信任根,SHA-256 防传输损坏,codesign 校验包完整性;未使用 Developer ID 与公证,因此无法抵御仓库本身被入侵。

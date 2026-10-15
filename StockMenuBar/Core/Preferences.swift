@@ -70,6 +70,13 @@ final class Preferences {
     /// 穿透锁定:点击穿过悬浮窗
     var floatingClickThrough: Bool { didSet { defaults.set(floatingClickThrough, forKey: "floatingClickThrough") } }
 
+    /// 是否自动检查更新
+    var autoCheckUpdates: Bool { didSet { defaults.set(autoCheckUpdates, forKey: "autoCheckUpdates") } }
+    /// 上次检查更新的时间
+    var lastUpdateCheck: Date? { didSet { defaults.set(lastUpdateCheck, forKey: "lastUpdateCheck") } }
+    /// 用户选择跳过的版本号
+    var skippedUpdateVersion: String? { didSet { defaults.set(skippedUpdateVersion, forKey: "skippedUpdateVersion") } }
+
     /// 开机自启状态(来自系统登录项)
     private(set) var launchAtLogin: Bool
     /// 开机自启最近一次错误
@@ -94,6 +101,9 @@ final class Preferences {
         floatingOpacity = min(max(opacity, 0.3), 1.0)
         floatingFade = defaults.object(forKey: "floatingFade") as? Bool ?? true
         floatingClickThrough = defaults.bool(forKey: "floatingClickThrough")
+        autoCheckUpdates = defaults.object(forKey: "autoCheckUpdates") as? Bool ?? true
+        lastUpdateCheck = defaults.object(forKey: "lastUpdateCheck") as? Date
+        skippedUpdateVersion = defaults.string(forKey: "skippedUpdateVersion")
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 

@@ -42,6 +42,7 @@ final class AppEnvironment {
     let clock: TradingClock
     let quotes: QuoteStore
     let search: SearchViewModel
+    let updates: UpdateManager
     let nav = MainNavigationModel()
     private(set) var scheduler: RefreshScheduler!
 
@@ -69,6 +70,7 @@ final class AppEnvironment {
         self.clock = clock
         self.quotes = quotes
         self.search = SearchViewModel(router: router)
+        self.updates = UpdateManager(prefs: prefs)
 
         quotes.symbolsProvider = { [weak self] in self?.trackedSymbols() ?? [] }
         scheduler = RefreshScheduler(store: quotes, prefs: prefs, hasConsumers: { [weak self] in self?.hasConsumers ?? false })
@@ -102,6 +104,20 @@ final class AppEnvironment {
     }
 
     // MARK: - 动作
+
+    /// 菜单「检查更新…」:打开设置页并立即检查;已发现新版本时只展示结果
+    func checkForUpdates() {
+        openMainWindow?(true)
+        if updates.availableRelease == nil && !updates.isBusy {
+            Task { await updates.check(userInitiated: true) }
+        }
+    }
+
+    /// 更新菜单项标题:发现新版本时直接提示版本号
+    var updateMenuTitle: String {
+        if let release = updates.availableRelease { return "发现新版本 \(release.version)…" }
+        return "检查更新…"
+    }
 
     /// 界面显隐变化后重新评估调度
     func consumersChanged() { scheduler.reschedule() }

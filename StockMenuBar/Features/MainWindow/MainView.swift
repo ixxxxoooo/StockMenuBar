@@ -98,9 +98,15 @@ struct MainView: View {
                 .frame(width: 28, height: 28)
                 .background(.regularMaterial, in: Circle())
                 .contentShape(Circle())
+                .overlay(alignment: .topTrailing) {
+                    // 有新版本时在齿轮右上角提示一个红点
+                    if env.updates.hasAvailableUpdate {
+                        Circle().fill(Color.red).frame(width: 8, height: 8).offset(x: 1, y: -1)
+                    }
+                }
         }
         .buttonStyle(.plain)
-        .help("偏好设置 (⌘,)")
+        .help(env.updates.hasAvailableUpdate ? "偏好设置 (⌘,) · 有新版本可更新" : "偏好设置 (⌘,)")
         .padding(.leading, 10)
         .padding(.bottom, 8)
     }
