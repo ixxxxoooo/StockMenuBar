@@ -25,6 +25,7 @@ English · [简体中文](README.md)
 - **High availability**: Tencent, Sina, Eastmoney and Yahoo Finance behind a router with health scoring, circuit breaker, hedged requests, validation, completeness checks for minute data and exponential-backoff retry.
 - **Watchlist**: groups, drag-to-reorder, pinyin / name / code search.
 - **Smart refresh**: follows trading sessions, pauses on sleep / lock / screen saver.
+- **Backup & migration**: export watchlist groups and settings to a JSON file from *Settings → Backup & Migration*, then import it (merge or replace) on another Mac.
 - **In-app updates**: checks GitHub Releases, then downloads, verifies, replaces itself and relaunches with one click.
 - **Zero dependencies**: Swift 6, SwiftUI, AppKit, Swift Charts, SwiftData.
 
@@ -59,3 +60,7 @@ All market data comes from public third-party endpoints (Tencent, Sina, Eastmone
 ## Contributing & License
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Released under the [MIT License](LICENSE) © 2026 [ixxxxoooo](https://github.com/ixxxxoooo).
+
+### Moving to a new Mac
+
+Open *Settings → Backup & Migration → Export…* on the old Mac and copy the resulting `StockMenuBar-backup-<date>.json` over. On the new Mac click *Import…* and choose **Merge** (keep what is already there and add what is new) or **Replace** (restore the backup exactly). Window positions, launch-at-login and update state are not included. For scripts: `--export-backup=PATH` / `--import-backup=PATH [--import-mode=merge|replace] [--no-settings]` run headless and exit.

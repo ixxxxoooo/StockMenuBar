@@ -178,6 +178,53 @@ final class WatchlistStore {
         persist()
     }
 
+    // MARK: - 导入
+
+    /// 导入结果
+    struct ImportResult: Equatable {
+        var groupsAdded = 0
+        var itemsAdded = 0
+        var itemsSkipped = 0
+    }
+
+    /// 导入备份中的分组与自选
+    /// - Parameters:
+    ///   - imported: 已清洗的分组(顺序即展示顺序)
+    ///   - mode: 合并(同名分组追加缺失的条目,新分组追加到末尾)或替换(先清空现有)
+    /// - Returns: 新增与跳过的数量
+    @discardableResult
+    func importGroups(_ imported: [BackupGroup], mode: BackupImportMode) -> ImportResult {
+        var result = ImportResult()
+        guard !imported.isEmpty else { return result }
+        if mode == .replace {
+            for g in (try? context.fetch(FetchDescriptor<GroupEntity>())) ?? [] { context.delete(g) }
+            try? context.save()
+        }
+        var existing = (try? context.fetch(FetchDescriptor<GroupEntity>(sortBy: [SortDescriptor(\.order)]))) ?? []
+        for group in imported {
+            let entity: GroupEntity
+            if let found = existing.first(where: { $0.name == group.name }) {
+                entity = found
+            } else {
+                entity = GroupEntity(name: group.name, order: existing.count)
+                context.insert(entity)
+                existing.append(entity)
+                result.groupsAdded += 1
+            }
+            var owned = Set(entity.items.map(\.symbolFull))
+            var order = (entity.items.map(\.order).max() ?? -1) + 1
+            for item in group.items {
+                guard let symbol = StockSymbol(full: item.symbol) else { continue }
+                guard owned.insert(symbol.full).inserted else { result.itemsSkipped += 1; continue }
+                context.insert(ItemEntity(symbolFull: symbol.full, name: item.name, order: order, group: entity))
+                order += 1
+                result.itemsAdded += 1
+            }
+        }
+        persist()
+        return result
+    }
+
     // MARK: - 内部
 
     private func groupEntity(id: UUID?) -> GroupEntity? {

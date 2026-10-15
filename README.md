@@ -32,6 +32,7 @@
 - **自选管理**:分组、拖拽自定义排序、拼音首字母 / 中文 / 代码搜索、右键置顶 / 固定到菜单栏 / 加入悬浮窗。
 - **智能刷新**:交易时段 3 / 5 / 10 秒,午休 1 分钟,休市不轮询;睡眠、锁屏、屏保自动暂停;期货与外盘按各自开市窗口轮询。
 - **体验细节**:红涨绿跌(可反转)、价格闪色、深浅色、Dock 图标随主面板显示、⌥⌘F / ⌥⌘L / ⌥⌘H 全局快捷键(悬浮窗 / 穿透 / 老板键)、⌘, 打开偏好设置。
+- **备份与迁移**:偏好设置里一键导出自选分组与设置为 JSON,换机器后导入(支持合并 / 替换)即可恢复。
 - **在线更新**:自动检查 GitHub 新版本,一键下载、校验并替换重启(见下文)。
 - **零依赖**:Swift 6 严格并发 + SwiftUI + AppKit + Swift Charts + SwiftData。
 
@@ -98,7 +99,7 @@ TEST_RUNNER_LIVE_TESTS=1 xcodebuild test -scheme StockMenuBar -destination 'plat
 
 ### 调试启动参数
 
-`--show-main` `--show-settings` `--show-popover` `--show-floating` `--pin=sh000001,sz399001` `--fail-source=tencent,sina`(让指定数据源恒定失败,用于验证故障转移)、`--update-now`(启动后立即检查并安装更新,配合环境变量 `STOCKMENUBAR_UPDATE_API` 指向自建的 latest JSON,用于测试更新流程)。
+`--show-main` `--show-settings` `--show-popover` `--show-floating` `--pin=sh000001,sz399001` `--fail-source=tencent,sina`(让指定数据源恒定失败,用于验证故障转移)、`--export-backup=PATH` / `--import-backup=PATH [--import-mode=merge|replace] [--no-settings]`(无界面导出 / 导入备份,完成后退出)、`--update-now`(启动后立即检查并安装更新,配合环境变量 `STOCKMENUBAR_UPDATE_API` 指向自建的 latest JSON,用于测试更新流程)。
 
 ## 项目结构
 
@@ -124,6 +125,7 @@ docs/               架构与数据源文档
 - **数据延迟或缺失?** 行情来自公开免费接口,可能有数秒到数分钟延迟;某个数据源被限流时会自动切到其余数据源,可在「偏好设置 → 行情数据源」查看各源状态。
 - **韩国指数没有成交量?** 这些指数的免费数据源不提供成交量,界面会隐藏没有数据的字段。
 - **升级后自选没了?** 1.1.0 起 Bundle ID 改为 `com.ixxxxoooo.StockMenuBar`;1.2.0 起不再启用沙盒,数据库移到 `~/Library/Application Support/StockMenuBar/`。这两次变更都不会迁移旧数据,此后在线更新不会影响数据。
+- **换了新电脑怎么迁移自选?** 在旧机器打开 **偏好设置 → 备份与迁移 → 导出…**,把生成的 `StockMenuBar-backup-日期.json` 拷到新机器,在同一位置点 **导入…**,选「合并」(保留新机器已有内容)或「替换」(完全还原备份)。备份不含窗口位置、开机自启与更新状态。
 - **更新提示「没有权限」?** 应用所在目录不可写时无法自动替换,请把应用放进「应用程序」后重试,或按提示手动替换。
 
 ## 发布流程

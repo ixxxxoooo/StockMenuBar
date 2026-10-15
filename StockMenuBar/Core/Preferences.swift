@@ -36,9 +36,9 @@ enum MenuBarLabelMode: String, CaseIterable, Sendable, Identifiable {
 @Observable
 final class Preferences {
     /// 允许的刷新间隔(秒)
-    static let allowedIntervals = [3, 5, 10]
+    nonisolated static let allowedIntervals = [3, 5, 10]
     /// 菜单栏最多固定的标的数
-    static let maxPinned = 2
+    nonisolated static let maxPinned = 2
 
     @ObservationIgnored private let defaults: UserDefaults
 

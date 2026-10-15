@@ -47,6 +47,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 启动参数(便于调试与截图验证):--show-main / --show-settings / --show-popover / --show-floating
     private func handleLaunchArguments() {
         let args = CommandLine.arguments
+        // 无界面的备份导入/导出(脚本迁移用):完成后直接退出
+        if BackupActions.handleLaunchArguments(args) {
+            fflush(stdout)
+            NSApp.terminate(nil)
+            return
+        }
         if args.contains("--show-main") { mainWindow.show(settings: false) }
         if args.contains("--show-settings") { mainWindow.show(settings: true) }
         if let pin = args.first(where: { $0.hasPrefix("--pin=") }) {

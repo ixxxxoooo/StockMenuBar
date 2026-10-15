@@ -11,6 +11,7 @@ import SwiftUI
 struct SettingsView: View {
     private let env = AppEnvironment.shared
     @State private var statuses: [ProviderStatus] = []
+    @State private var backupOutcome: BackupOutcome?
 
     var body: some View {
         @Bindable var prefs = env.prefs
@@ -92,6 +93,8 @@ struct SettingsView: View {
                     .font(.footnote).foregroundStyle(.secondary)
             }
 
+            backupSection
+
             updateSection
 
             aboutSection
@@ -103,6 +106,27 @@ struct SettingsView: View {
                 statuses = await env.router.statuses()
                 try? await Task.sleep(for: .seconds(2))
             }
+        }
+    }
+
+    /// 数据备份与迁移:导出自选与设置为 JSON,在另一台机器导入
+    private var backupSection: some View {
+        Section("备份与迁移") {
+            LabeledContent {
+                HStack {
+                    Button("导出…") { backupOutcome = BackupActions.exportWithPanel() ?? backupOutcome }
+                    Button("导入…") { backupOutcome = BackupActions.importWithPanel() ?? backupOutcome }
+                }
+            } label: {
+                Text("自选分组、条目顺序与偏好设置").foregroundStyle(.secondary)
+            }
+            if let outcome = backupOutcome {
+                Text(outcome.message).font(.callout)
+                    .foregroundStyle(outcome.isError ? Color.red : Color.green)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text("换机器时:在旧机器点「导出」得到一个 .json 文件,拷到新机器后点「导入」,选择「合并」或「替换」即可。备份不含窗口位置、开机自启与更新状态。")
+                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 
