@@ -77,7 +77,7 @@ struct Sparkline: View {
             let range = MinuteScale.range(prevClose: data.prevClose, prices: data.bars.map(\.price))
             let span = max(range.hi - range.lo, 0.000001)
             func point(_ b: MinuteBar) -> CGPoint {
-                CGPoint(x: size.width * CGFloat(b.index) / 240,
+                CGPoint(x: size.width * CGFloat(b.index) / CGFloat(data.axis.total),
                         y: size.height * (1 - CGFloat((b.price - range.lo) / span)))
             }
             let pts = data.bars.map(point)

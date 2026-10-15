@@ -13,6 +13,8 @@ import SwiftUI
 /// 让两张图共享悬停十字光标
 private struct ChartHoverModifier: ViewModifier {
     @Binding var hoverIndex: Int?
+    /// 横轴最大序号(A 股 240,期货按品种时段)
+    let maxIndex: Int
 
     func body(content: Content) -> some View {
         content.chartOverlay { proxy in
@@ -25,7 +27,7 @@ private struct ChartHoverModifier: ViewModifier {
                             guard let frame = proxy.plotFrame else { return }
                             let x = location.x - geo[frame].origin.x
                             if let value: Double = proxy.value(atX: x) {
-                                hoverIndex = min(max(Int(value.rounded()), 0), 240)
+                                hoverIndex = min(max(Int(value.rounded()), 0), maxIndex)
                             }
                         case .ended:
                             hoverIndex = nil
@@ -78,7 +80,8 @@ struct MinuteChartView: View {
         let ticks = (-2...2).map { prev + dev * Double($0) / 2 }
         let trend = Sparkline.trend(of: series)
         let color = Theme.color(trend, redUp: prefs.redUp)
-        let decimals = series.symbol.kind.decimals
+        let decimals = series.decimals
+        let axis = series.axis
         let hoverBar = hoverIndex.flatMap { h in series.bars.last { $0.index <= h } }
 
         return Chart {
@@ -108,22 +111,22 @@ struct MinuteChartView: View {
                     .lineStyle(StrokeStyle(lineWidth: 0.8))
                     .annotation(position: .top, alignment: .center, spacing: 2,
                                 overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
-                        tooltip(bar, prev: prev, decimals: decimals)
+                        tooltip(bar, prev: prev, decimals: decimals, axis: axis)
                     }
                 PointMark(x: .value("时间", bar.index), y: .value("价格", bar.price))
                     .foregroundStyle(color)
                     .symbolSize(40)
             }
         }
-        .chartXScale(domain: 0...240)
+        .chartXScale(domain: 0...axis.total)
         .chartYScale(domain: range.lo...range.hi)
         .chartXAxis {
-            AxisMarks(values: [0, 60, 120, 180, 240]) { value in
+            AxisMarks(values: axis.tickIndices) { value in
                 AxisGridLine().foregroundStyle(Color.secondary.opacity(0.18))
-                // 末尾刻度(15:00)右对齐,避免被绘图区右侧轴标签挤掉
-                AxisValueLabel(anchor: value.as(Int.self) == 240 ? .topTrailing : .top, horizontalSpacing: 0) {
+                // 末尾刻度(收盘)右对齐,避免被绘图区右侧轴标签挤掉
+                AxisValueLabel(anchor: value.as(Int.self) == axis.total ? .topTrailing : .top, horizontalSpacing: 0) {
                     if let i = value.as(Int.self) {
-                        Text(Self.xLabel(i)).font(.system(size: 10)).foregroundStyle(.secondary)
+                        Text(axis.tickLabel(index: i)).font(.system(size: 10)).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -155,15 +158,15 @@ struct MinuteChartView: View {
         .chartPlotStyle { plot in
             plot.background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.025)))
         }
-        .modifier(ChartHoverModifier(hoverIndex: $hoverIndex))
+        .modifier(ChartHoverModifier(hoverIndex: $hoverIndex, maxIndex: series.axis.total))
     }
 
     /// 悬停提示
-    private func tooltip(_ bar: MinuteBar, prev: Double, decimals: Int) -> some View {
+    private func tooltip(_ bar: MinuteBar, prev: Double, decimals: Int, axis: MinuteAxis) -> some View {
         let pct = prev > 0 ? (bar.price - prev) / prev * 100 : 0
         let trend = Theme.trend(of: bar.price - prev, epsilon: 1e-9)
         return VStack(alignment: .leading, spacing: 1) {
-            Text(Fmt.minuteLabel(index: bar.index)).foregroundStyle(.secondary)
+            Text(axis.label(index: bar.index)).foregroundStyle(.secondary)
             HStack(spacing: 6) {
                 Text(Fmt.price(bar.price, decimals: decimals)).fontWeight(.semibold)
                 Text(Fmt.percent(pct))
@@ -185,6 +188,7 @@ struct MinuteChartView: View {
 
     private func volumeChart(_ series: MinuteSeries) -> some View {
         let bars = series.bars
+        let axis = series.axis
         // 价格不低于上一分钟记为上涨量
         let ups: [Bool] = bars.enumerated().map { i, bar in
             i == 0 ? bar.price >= series.prevClose : bar.price >= bars[i - 1].price
@@ -206,10 +210,10 @@ struct MinuteChartView: View {
                     .lineStyle(StrokeStyle(lineWidth: 0.8))
             }
         }
-        .chartXScale(domain: 0...240)
+        .chartXScale(domain: 0...axis.total)
         .chartYScale(domain: 0...(maxVolume * 1.1))
         .chartXAxis {
-            AxisMarks(values: [0, 60, 120, 180, 240]) { _ in
+            AxisMarks(values: axis.tickIndices) { _ in
                 AxisGridLine().foregroundStyle(Color.secondary.opacity(0.18))
             }
         }
@@ -231,17 +235,6 @@ struct MinuteChartView: View {
         .chartPlotStyle { plot in
             plot.background(RoundedRectangle(cornerRadius: 6).fill(Color.primary.opacity(0.025)))
         }
-        .modifier(ChartHoverModifier(hoverIndex: $hoverIndex))
-    }
-
-    /// 横轴刻度文本
-    private static func xLabel(_ index: Int) -> String {
-        switch index {
-        case 0: return "09:30"
-        case 60: return "10:30"
-        case 120: return "11:30/13:00"
-        case 180: return "14:00"
-        default: return "15:00"
-        }
+        .modifier(ChartHoverModifier(hoverIndex: $hoverIndex, maxIndex: series.axis.total))
     }
 }

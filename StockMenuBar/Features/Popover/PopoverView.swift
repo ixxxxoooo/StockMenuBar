@@ -154,7 +154,7 @@ struct PopoverView: View {
         var seen = Set<StockSymbol>()
         var result: [WatchItem] = []
         for group in env.watchlist.groups {
-            for item in group.items where Pinyin.matches(keyword: key, name: item.name, code: item.symbol.code) {
+            for item in group.items where Pinyin.matches(keyword: key, name: item.name, code: item.symbol.displayCode) {
                 if seen.insert(item.symbol).inserted { result.append(item) }
             }
         }
@@ -186,7 +186,7 @@ struct PopoverRow: View {
                     }
                     if !minimal {
                         HStack(spacing: 4) {
-                            Text(item.symbol.code).font(.system(size: 10.5).monospacedDigit()).foregroundStyle(.secondary)
+                            Text(item.symbol.displayCode).font(.system(size: 10.5).monospacedDigit()).foregroundStyle(.secondary)
                             KindTag(kind: item.symbol.kind)
                         }
                     }

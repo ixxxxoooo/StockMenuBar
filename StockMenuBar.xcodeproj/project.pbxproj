@@ -8,10 +8,12 @@
 
 /* Begin PBXBuildFile section */
 		02A972418355903123AE66FD /* CoreLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC5E3087939EC501C648C79C /* CoreLogicTests.swift */; };
+		051A57218A46754BCC3F801A /* FuturesCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D4EB9F7DE2208D134825A50 /* FuturesCatalog.swift */; };
 		076E6CA5AB171B5A2D81D18A /* SinaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2252B4B76F5C91BD2A93B32D /* SinaProvider.swift */; };
 		0807CCAE0717C1489007FBBD /* CircuitBreaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F08931033AF74AED887372C /* CircuitBreaker.swift */; };
 		097D58A369106683BAAAE2CB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2248693624D49D3A03CC9EB7 /* SettingsView.swift */; };
 		0C5C27DFCD7432F4C86416E4 /* QuoteStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF325AF9B91ED9CF74123904 /* QuoteStore.swift */; };
+		1075FB18AB8051815B393BC2 /* em_futures_trends.json in Resources */ = {isa = PBXBuildFile; fileRef = DE690E1B4AEB1E713C97342C /* em_futures_trends.json */; };
 		11CA2A2418C712DA95EABA6B /* FaultInjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1816265F7951FBDC488E00F0 /* FaultInjection.swift */; };
 		11F87F822AD5E2868C0279B2 /* TextCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 679F75821D5C1C61F9FCC71E /* TextCodec.swift */; };
 		1606F0A03E4AB62BF7C0826D /* PowerStateMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E18CEA32498C2410E23F127 /* PowerStateMonitor.swift */; };
@@ -24,10 +26,12 @@
 		3006A257AB53ECE82AAF58D9 /* SearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43180E45AF4BB363D91BC247 /* SearchViewModel.swift */; };
 		32B918C878C23C38703CAFAC /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBC1B544C7A1B738E6EC3BEC /* Theme.swift */; };
 		32F9DEB0C3BD544C48199601 /* TextCodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 679F75821D5C1C61F9FCC71E /* TextCodec.swift */; };
+		3A45A8778AE49BB04FAAAE2B /* sina_futures_minute.txt in Resources */ = {isa = PBXBuildFile; fileRef = 5F91A4D2BE76E7213DE73686 /* sina_futures_minute.txt */; };
 		3FD6310BE5526966BE83B749 /* FloatingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90884A51BC3D37BF31A7506 /* FloatingViews.swift */; };
 		3FEB26D1B34CB401C3238F2C /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A6643F3CDF1862A0A8A6E2A /* MainView.swift */; };
 		4275AF11C699C4E18C5F6288 /* CommonViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F48EAFD935CDD2718CBCCB8D /* CommonViews.swift */; };
 		43B2A03C040C50D9D1D59EA2 /* StockSymbol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B1BC9C49C181A4188C33CD5 /* StockSymbol.swift */; };
+		43CF97C2A1B21E533BC10498 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 06CB328B15481C6270D177B0 /* Assets.xcassets */; };
 		46A4157514D91BE09DD12A16 /* PopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6518ED00E634BEB5992CFD08 /* PopoverView.swift */; };
 		4C14EE4E307D69A63F2F0038 /* TestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00BCC735170F05324FE174C /* TestSupport.swift */; };
 		537EA031685841A5925313C5 /* sina_quote.txt in Resources */ = {isa = PBXBuildFile; fileRef = 3A101FA56641A49D7EC1FB52 /* sina_quote.txt */; };
@@ -49,6 +53,7 @@
 		8E38567283964747139DBCF8 /* StockDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39389B98184B51341A41DF21 /* StockDetailView.swift */; };
 		8EE034A992D239F1FBB12B07 /* em_quote.json in Resources */ = {isa = PBXBuildFile; fileRef = 245E10F8AAAEB047411C6E90 /* em_quote.json */; };
 		9227CC5043CC5346F7A63D09 /* WatchlistModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F226B20D1A3189B7D7EFC64B /* WatchlistModels.swift */; };
+		934059B4A11A50C80171A8BE /* em_futures_search.json in Resources */ = {isa = PBXBuildFile; fileRef = 6EAFE644A4B95BAE5A73B364 /* em_futures_search.json */; };
 		96B1E51025C3F3641219A76F /* PowerStateMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E18CEA32498C2410E23F127 /* PowerStateMonitor.swift */; };
 		97055095F267A17A7E9FEB5B /* SinaProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2252B4B76F5C91BD2A93B32D /* SinaProvider.swift */; };
 		99D2D908667CACD453FC0B64 /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96B871F29344855CBFD325F8 /* Formatters.swift */; };
@@ -57,6 +62,7 @@
 		9FF97EEB218C46BBF20696AE /* MainWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F61ADA51543227317549889 /* MainWindowController.swift */; };
 		A91CDB80CDBF12B6384CF19B /* ProviderRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A86DD1E2FA44EF2436574DD /* ProviderRouter.swift */; };
 		AA74634EB15DBF6688556ABA /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44F3100520E34D3D4A722C5C /* AppDelegate.swift */; };
+		ACCC22B2D7BD8B3FF6DCFF93 /* sina_futures_quote.txt in Resources */ = {isa = PBXBuildFile; fileRef = 87E0E3ACB5AF9D7667AFF8A4 /* sina_futures_quote.txt */; };
 		AD027845C03DC3A07CFACA5F /* LiveProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8CEA68DA03004B19F02563FA /* LiveProviderTests.swift */; };
 		B0425D84A2A0BBE651029331 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13588076F798FD0DA08129D9 /* Preferences.swift */; };
 		B52733EF559FD290BEE45971 /* RefreshScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 098CCC30DD6C03F93D590801 /* RefreshScheduler.swift */; };
@@ -72,19 +78,24 @@
 		C9EB32693D60067A4EE09902 /* OrderBookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B556953BE19EAC6F6F696FB9 /* OrderBookView.swift */; };
 		CA7DB6EE4E2F1A251E0882E5 /* sina_search.txt in Resources */ = {isa = PBXBuildFile; fileRef = B911BE9965FDB4B316BE0A65 /* sina_search.txt */; };
 		D2AA3AE05B684DBC12AAFB9D /* WatchlistModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = F226B20D1A3189B7D7EFC64B /* WatchlistModels.swift */; };
+		D69B7AADFCB8E9F3763AAA71 /* FuturesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B007FF1D4C2C40F302D3998 /* FuturesTests.swift */; };
 		E6D35406E7126C87599085AF /* SearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43180E45AF4BB363D91BC247 /* SearchViewModel.swift */; };
 		EF480B2CEDF8A16248AD2B47 /* EastmoneyProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A138F6A5D31ED7DF0B6F9A02 /* EastmoneyProvider.swift */; };
 		EF4A8E0568B62F034294CCDB /* ObservationHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F7661C92A18EE6808BA81BF /* ObservationHelper.swift */; };
+		F101B31361CDFFF5FE334922 /* FuturesCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D4EB9F7DE2208D134825A50 /* FuturesCatalog.swift */; };
 		F1FB93BC7D66C11C6F1E183A /* ParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40996B92B922FE97C9AB503F /* ParserTests.swift */; };
+		F2278F5B3DEB01006605D944 /* em_futures_quote.json in Resources */ = {isa = PBXBuildFile; fileRef = 179307BC05DC060A83425BA9 /* em_futures_quote.json */; };
 		F4277E08B5A941386CDB405C /* WatchlistStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EDBDB8D41FB9E3AB536CF8E /* WatchlistStore.swift */; };
 		F439C1B90A9D78407C788CD3 /* Quote.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1645D056E2426501B9B4BBAF /* Quote.swift */; };
 		F53D8595B0CFDB49CAA755B7 /* TencentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD140B468346317F831EA80 /* TencentProvider.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		06CB328B15481C6270D177B0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		098CCC30DD6C03F93D590801 /* RefreshScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshScheduler.swift; sourceTree = "<group>"; };
 		13588076F798FD0DA08129D9 /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
 		1645D056E2426501B9B4BBAF /* Quote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Quote.swift; sourceTree = "<group>"; };
+		179307BC05DC060A83425BA9 /* em_futures_quote.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = em_futures_quote.json; sourceTree = "<group>"; };
 		1816265F7951FBDC488E00F0 /* FaultInjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaultInjection.swift; sourceTree = "<group>"; };
 		1A86DD1E2FA44EF2436574DD /* ProviderRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderRouter.swift; sourceTree = "<group>"; };
 		1D7A5B434ED5C463AC0BF30B /* SearchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViews.swift; sourceTree = "<group>"; };
@@ -93,6 +104,7 @@
 		2248693624D49D3A03CC9EB7 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		2252B4B76F5C91BD2A93B32D /* SinaProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SinaProvider.swift; sourceTree = "<group>"; };
 		245E10F8AAAEB047411C6E90 /* em_quote.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = em_quote.json; sourceTree = "<group>"; };
+		2D4EB9F7DE2208D134825A50 /* FuturesCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuturesCatalog.swift; sourceTree = "<group>"; };
 		2EF43B64314D57C36EC64F76 /* FloatingPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingPanelController.swift; sourceTree = "<group>"; };
 		39389B98184B51341A41DF21 /* StockDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StockDetailView.swift; sourceTree = "<group>"; };
 		398F4BC17EF4B3F944A2F5A7 /* StatusItemController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusItemController.swift; sourceTree = "<group>"; };
@@ -106,12 +118,16 @@
 		5A1A6929016D1950803A2E71 /* em_search.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = em_search.json; sourceTree = "<group>"; };
 		5A6643F3CDF1862A0A8A6E2A /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		5EDBDB8D41FB9E3AB536CF8E /* WatchlistStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchlistStore.swift; sourceTree = "<group>"; };
+		5F91A4D2BE76E7213DE73686 /* sina_futures_minute.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = sina_futures_minute.txt; sourceTree = "<group>"; };
 		6518ED00E634BEB5992CFD08 /* PopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverView.swift; sourceTree = "<group>"; };
 		679F75821D5C1C61F9FCC71E /* TextCodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextCodec.swift; sourceTree = "<group>"; };
+		6EAFE644A4B95BAE5A73B364 /* em_futures_search.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = em_futures_search.json; sourceTree = "<group>"; };
 		727EBDF9F104CF25E56015E7 /* MinuteChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MinuteChartView.swift; sourceTree = "<group>"; };
 		76638D502D4AF1E69DDE680D /* StockMenuBarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = StockMenuBarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		7B007FF1D4C2C40F302D3998 /* FuturesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FuturesTests.swift; sourceTree = "<group>"; };
 		7E5F1F9844BD284F87F36E25 /* tencent_search.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = tencent_search.txt; sourceTree = "<group>"; };
 		7F08931033AF74AED887372C /* CircuitBreaker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircuitBreaker.swift; sourceTree = "<group>"; };
+		87E0E3ACB5AF9D7667AFF8A4 /* sina_futures_quote.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = sina_futures_quote.txt; sourceTree = "<group>"; };
 		8CEA68DA03004B19F02563FA /* LiveProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveProviderTests.swift; sourceTree = "<group>"; };
 		96B871F29344855CBFD325F8 /* Formatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formatters.swift; sourceTree = "<group>"; };
 		9AD13510CBFE311BFBDA1E9F /* tencent_minute.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = tencent_minute.json; sourceTree = "<group>"; };
@@ -131,6 +147,7 @@
 		D4D803EB4619D521B2954A19 /* StockMenuBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StockMenuBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D575F01D6707E8DA41FA859B /* AppEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppEnvironment.swift; sourceTree = "<group>"; };
 		DD2D1903BBF920E3F8BD2590 /* TradingClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TradingClock.swift; sourceTree = "<group>"; };
+		DE690E1B4AEB1E713C97342C /* em_futures_trends.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = em_futures_trends.json; sourceTree = "<group>"; };
 		E00BCC735170F05324FE174C /* TestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TestSupport.swift; sourceTree = "<group>"; };
 		EF325AF9B91ED9CF74123904 /* QuoteStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteStore.swift; sourceTree = "<group>"; };
 		F226B20D1A3189B7D7EFC64B /* WatchlistModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchlistModels.swift; sourceTree = "<group>"; };
@@ -138,6 +155,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		30CBE2393105BB66974DA37E /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				06CB328B15481C6270D177B0 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		3E3D36C6F7C3E48F75B4133C /* Shared */ = {
 			isa = PBXGroup;
 			children = (
@@ -195,6 +220,7 @@
 				422FD418F8310857F653B457 /* Core */,
 				DDA4BA6F46588964D8DE5D44 /* Data */,
 				9FFF76F6C045F80D63A9C362 /* Features */,
+				30CBE2393105BB66974DA37E /* Resources */,
 				3E3D36C6F7C3E48F75B4133C /* Shared */,
 			);
 			path = StockMenuBar;
@@ -223,6 +249,7 @@
 		AC1242FB3AC2B9BCA205D096 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				2D4EB9F7DE2208D134825A50 /* FuturesCatalog.swift */,
 				1645D056E2426501B9B4BBAF /* Quote.swift */,
 				9B1BC9C49C181A4188C33CD5 /* StockSymbol.swift */,
 				F226B20D1A3189B7D7EFC64B /* WatchlistModels.swift */,
@@ -243,6 +270,7 @@
 			isa = PBXGroup;
 			children = (
 				CC5E3087939EC501C648C79C /* CoreLogicTests.swift */,
+				7B007FF1D4C2C40F302D3998 /* FuturesTests.swift */,
 				8CEA68DA03004B19F02563FA /* LiveProviderTests.swift */,
 				40996B92B922FE97C9AB503F /* ParserTests.swift */,
 				BE7413AB7540CC2AC7ED6DF0 /* RouterTests.swift */,
@@ -305,9 +333,14 @@
 		F884B236906075CBF9F3A244 /* Fixtures */ = {
 			isa = PBXGroup;
 			children = (
+				179307BC05DC060A83425BA9 /* em_futures_quote.json */,
+				6EAFE644A4B95BAE5A73B364 /* em_futures_search.json */,
+				DE690E1B4AEB1E713C97342C /* em_futures_trends.json */,
 				245E10F8AAAEB047411C6E90 /* em_quote.json */,
 				5A1A6929016D1950803A2E71 /* em_search.json */,
 				D24FD3A0780A5316032B0469 /* em_trends.json */,
+				5F91A4D2BE76E7213DE73686 /* sina_futures_minute.txt */,
+				87E0E3ACB5AF9D7667AFF8A4 /* sina_futures_quote.txt */,
 				3A101FA56641A49D7EC1FB52 /* sina_quote.txt */,
 				B911BE9965FDB4B316BE0A65 /* sina_search.txt */,
 				9AD13510CBFE311BFBDA1E9F /* tencent_minute.json */,
@@ -333,6 +366,7 @@
 			buildConfigurationList = AF8D32A0A690F153395542C9 /* Build configuration list for PBXNativeTarget "StockMenuBar" */;
 			buildPhases = (
 				FD0BFCDE7668678FF7BA4B07 /* Sources */,
+				63AFC245258D504BE3EC257A /* Resources */,
 			);
 			buildRules = (
 			);
@@ -401,13 +435,26 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		63AFC245258D504BE3EC257A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				43CF97C2A1B21E533BC10498 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		DFD06EFAEEFF2F5FA9A24718 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F2278F5B3DEB01006605D944 /* em_futures_quote.json in Resources */,
+				934059B4A11A50C80171A8BE /* em_futures_search.json in Resources */,
+				1075FB18AB8051815B393BC2 /* em_futures_trends.json in Resources */,
 				8EE034A992D239F1FBB12B07 /* em_quote.json in Resources */,
 				C0942C92BD4ECA4E7DE5BFAD /* em_search.json in Resources */,
 				C7071EAAFA8C887275A94DDD /* em_trends.json in Resources */,
+				3A45A8778AE49BB04FAAAE2B /* sina_futures_minute.txt in Resources */,
+				ACCC22B2D7BD8B3FF6DCFF93 /* sina_futures_quote.txt in Resources */,
 				537EA031685841A5925313C5 /* sina_quote.txt in Resources */,
 				CA7DB6EE4E2F1A251E0882E5 /* sina_search.txt in Resources */,
 				BFCFF8449E4613ED1D7BD314 /* tencent_minute.json in Resources */,
@@ -429,6 +476,8 @@
 				2EA0A564929E2CCB296326F0 /* EastmoneyProvider.swift in Sources */,
 				11CA2A2418C712DA95EABA6B /* FaultInjection.swift in Sources */,
 				99D2D908667CACD453FC0B64 /* Formatters.swift in Sources */,
+				051A57218A46754BCC3F801A /* FuturesCatalog.swift in Sources */,
+				D69B7AADFCB8E9F3763AAA71 /* FuturesTests.swift in Sources */,
 				AD027845C03DC3A07CFACA5F /* LiveProviderTests.swift in Sources */,
 				F1FB93BC7D66C11C6F1E183A /* ParserTests.swift in Sources */,
 				1606F0A03E4AB62BF7C0826D /* PowerStateMonitor.swift in Sources */,
@@ -466,6 +515,7 @@
 				764087C4F60F3B7512A15B52 /* FloatingPanelController.swift in Sources */,
 				3FD6310BE5526966BE83B749 /* FloatingViews.swift in Sources */,
 				843C9FC4767E1C8DCF456EDC /* Formatters.swift in Sources */,
+				F101B31361CDFFF5FE334922 /* FuturesCatalog.swift in Sources */,
 				811B67F275609447E9EC7D6E /* HotKeyCenter.swift in Sources */,
 				3FEB26D1B34CB401C3238F2C /* MainView.swift in Sources */,
 				9FF97EEB218C46BBF20696AE /* MainWindowController.swift in Sources */,
@@ -587,7 +637,7 @@
 		70D484B09146E71EDB583307 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = StockMenuBar/StockMenuBar.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_HARDENED_RUNTIME = NO;
@@ -622,7 +672,7 @@
 		971E690E1AEDE593C76B59FA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = StockMenuBar/StockMenuBar.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
 				ENABLE_HARDENED_RUNTIME = NO;

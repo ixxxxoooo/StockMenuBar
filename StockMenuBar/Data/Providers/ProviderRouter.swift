@@ -95,10 +95,57 @@ actor ProviderRouter {
 
     // MARK: - 对外接口
 
-    /// 批量获取行情。结果会过滤无效行情;请求了证券却一条有效数据都没有时视为该源失败
+    /// 批量获取行情。A 股与期货分别路由(各自有不同的可用数据源集合),再合并结果。
+    /// 结果会过滤无效行情;请求了证券却一条有效数据都没有时视为该源失败。
+    /// 任一类别成功即返回成功(另一类别失败时保留旧数据),全部失败才抛错。
     func quotes(for symbols: [StockSymbol]) async throws -> RoutedResult<[Quote]> {
+        let stocks = symbols.filter { !$0.isFuture }
+        let futures = symbols.filter(\.isFuture)
+        if futures.isEmpty { return try await routeQuotes(stocks, futures: false) }
+        if stocks.isEmpty { return try await routeQuotes(futures, futures: true) }
+
+        async let stockTask = Self.capture { try await self.routeQuotes(stocks, futures: false) }
+        async let futureTask = Self.capture { try await self.routeQuotes(futures, futures: true) }
+        let (stockResult, futureResult) = await (stockTask, futureTask)
+        switch (stockResult, futureResult) {
+        case (.success(let a), .success(let b)):
+            return RoutedResult(value: a.value + b.value, provider: a.provider, latency: max(a.latency, b.latency))
+        case (.success(let a), .failure):
+            return a
+        case (.failure, .success(let b)):
+            return b
+        case (.failure(let error), .failure):
+            throw error
+        }
+    }
+
+    /// 把抛错的异步操作包装为 Result
+    private static func capture<T: Sendable>(_ work: @Sendable () async throws -> T) async -> Result<T, Error> {
+        do { return .success(try await work()) } catch { return .failure(error) }
+    }
+
+    /// 单一类别(A 股或期货)的行情路由
+    private func routeQuotes(_ symbols: [StockSymbol], futures: Bool) async throws -> RoutedResult<[Quote]> {
+        var result = try await routeQuoteBatch(symbols, futures: futures, excluding: [])
+        // 期货各数据源覆盖的品种不同:首选源缺失的品种,交给其余数据源补一次(尽力而为,失败忽略)
+        if futures {
+            let got = Set(result.value.map(\.symbol))
+            let missing = symbols.filter { !got.contains($0) }
+            if !missing.isEmpty,
+               let extra = try? await routeQuoteBatch(missing, futures: true, excluding: [result.provider]) {
+                result = RoutedResult(value: result.value + extra.value, provider: result.provider, latency: result.latency)
+            }
+        }
+        return result
+    }
+
+    /// 一批行情的单次路由
+    private func routeQuoteBatch(_ symbols: [StockSymbol], futures: Bool, excluding: Set<ProviderID>) async throws -> RoutedResult<[Quote]> {
         let requestCount = symbols.count
-        return try await execute(capability: .quotes,
+        let capability: ProviderCapability = futures ? .futuresQuotes : .quotes
+        return try await execute(capability: capability,
+                                 excluding: excluding,
+                                 coverage: { provider in Self.coverage(of: provider, capability: capability, symbols: symbols) },
                                  validate: { (quotes: [Quote]) in requestCount == 0 || quotes.contains(where: { $0.isValid }) },
                                  operation: { provider in
             try await provider.fetchQuotes(symbols).filter { $0.isValid }
@@ -107,16 +154,39 @@ actor ProviderRouter {
 
     /// 获取当日分时
     func minute(for symbol: StockSymbol) async throws -> RoutedResult<MinuteSeries> {
-        try await execute(capability: .minute,
-                          validate: { (s: MinuteSeries) in !s.bars.isEmpty && s.prevClose > 0 },
-                          operation: { provider in try await provider.fetchMinute(symbol: symbol) })
+        let capability: ProviderCapability = symbol.isFuture ? .futuresMinute : .minute
+        return try await execute(capability: capability,
+                                 coverage: { provider in Self.coverage(of: provider, capability: capability, symbols: [symbol]) },
+                                 validate: { (s: MinuteSeries) in !s.bars.isEmpty && s.prevClose > 0 },
+                                 operation: { provider in try await provider.fetchMinute(symbol: symbol) })
     }
 
     /// 搜索联想(空结果也视为成功,不触发转移)
     func search(_ keyword: String) async throws -> RoutedResult<[SearchResult]> {
         try await execute(capability: .search,
+                          coverage: { Self.coverage(of: $0, capability: .search, symbols: []) },
                           validate: { (_: [SearchResult]) in true },
                           operation: { provider in try await provider.search(keyword: keyword) })
+    }
+
+    /// 搜索期货与全球指数
+    func searchFutures(_ keyword: String) async throws -> RoutedResult<[SearchResult]> {
+        try await execute(capability: .futuresSearch,
+                          coverage: { Self.coverage(of: $0, capability: .futuresSearch, symbols: []) },
+                          validate: { (_: [SearchResult]) in true },
+                          operation: { provider in try await provider.searchFutures(keyword: keyword) })
+    }
+
+    /// 数据源对一组标的的覆盖程度
+    enum Coverage: Int, Sendable { case none = 0, partial = 1, full = 2 }
+
+    /// 计算覆盖度:不具备能力为 none;能服务全部标的为 full;只能服务其中一部分为 partial
+    nonisolated static func coverage(of provider: any QuoteProvider, capability: ProviderCapability, symbols: [StockSymbol]) -> Coverage {
+        guard provider.capabilities.contains(capability) else { return .none }
+        guard !symbols.isEmpty else { return .full }
+        let served = symbols.filter { provider.canServe(capability, symbol: $0) }.count
+        if served == symbols.count { return .full }
+        return served == 0 ? .none : .partial
     }
 
     /// 各数据源当前状态快照
@@ -132,12 +202,19 @@ actor ProviderRouter {
 
     /// 候选源排序:先按熔断可用性筛选,再按 延迟 × (1 + 5 × 失败率) 升序。
     /// 全部熔断时「失败放行」(fail-open),仍按评分尝试,保证最大可用性。
-    private func rankedCandidates(for capability: ProviderCapability) -> [ProviderID] {
+    /// 覆盖全部标的的数据源优先于只覆盖部分标的的数据源(后者仅作兜底)
+    private func rankedCandidates(excluding: Set<ProviderID> = [], coverage: @Sendable (any QuoteProvider) -> Coverage) -> [ProviderID] {
         let now = clock()
-        let capable = order.filter { providers[$0]?.capabilities.contains(capability) == true }
+        var level: [ProviderID: Coverage] = [:]
+        for id in order where !excluding.contains(id) { if let p = providers[id] { level[id] = coverage(p) } }
+        let capable = order.filter { (level[$0] ?? .none) != .none }
         let available = capable.filter { stats[$0]?.breaker.isAvailable(now: now) == true }
         let pool = available.isEmpty ? capable : available
-        return pool.sorted { score($0) < score($1) }
+        return pool.sorted { a, b in
+            let la = level[a]?.rawValue ?? 0, lb = level[b]?.rawValue ?? 0
+            if la != lb { return la > lb }
+            return score(a) < score(b)
+        }
     }
 
     private func score(_ id: ProviderID) -> Double {
@@ -147,10 +224,12 @@ actor ProviderRouter {
 
     private func execute<T: Sendable>(
         capability: ProviderCapability,
+        excluding: Set<ProviderID> = [],
+        coverage: @Sendable (any QuoteProvider) -> Coverage,
         validate: @escaping @Sendable (T) -> Bool,
         operation: @escaping @Sendable (any QuoteProvider) async throws -> T
     ) async throws -> RoutedResult<T> {
-        let candidates = rankedCandidates(for: capability)
+        let candidates = rankedCandidates(excluding: excluding, coverage: coverage)
         guard !candidates.isEmpty else { throw ProviderError.unsupported }
         let hedge = config.hedgeDelay
         let providerMap = providers

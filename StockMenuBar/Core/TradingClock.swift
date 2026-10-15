@@ -72,4 +72,19 @@ struct TradingClock: Sendable {
         }
         return nextOpen(after: date).timeIntervalSince(date)
     }
+
+    /// 期货(含外盘)是否可能处于交易中。
+    /// 国内期货日盘 9:00-15:00、夜盘 21:00-次日 2:30,外盘(COMEX/LME/NYMEX)近 24 小时交易,
+    /// 因此以「周一 06:00 至周六 05:00(上海时间)」作为可能开市的宽窗口,周日全天休市。
+    /// 窗口内是否真有成交由行情自身决定,调度只负责不在周末空转。
+    func futuresMayBeOpen(at date: Date) -> Bool {
+        let weekday = ChinaTime.calendar.component(.weekday, from: date) // 1=周日 ... 7=周六
+        let m = ChinaTime.minuteOfDay(date)
+        switch weekday {
+        case 1: return false
+        case 2: return m >= 6 * 60
+        case 7: return m < 5 * 60
+        default: return true
+        }
+    }
 }

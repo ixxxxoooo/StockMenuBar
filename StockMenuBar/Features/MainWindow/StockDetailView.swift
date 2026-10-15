@@ -31,8 +31,13 @@ struct StockDetailView: View {
                         MinuteChartView(series: loader.series, isLoading: loader.isLoading, failed: loader.failed)
                     }
                     .frame(maxWidth: .infinity)
-                    OrderBookView(quote: quote)
-                        .frame(width: 236)
+                    if item.symbol.isFuture {
+                        FuturesInfoView(symbol: item.symbol, quote: quote, series: loader.series)
+                            .frame(width: 236)
+                    } else {
+                        OrderBookView(quote: quote)
+                            .frame(width: 236)
+                    }
                 }
             }
             .padding(24)
@@ -47,7 +52,7 @@ struct StockDetailView: View {
     private func header(_ quote: Quote?) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(quote?.name ?? item.name).font(.system(size: 22, weight: .bold))
-            Text("\(item.symbol.market.rawValue.uppercased()) \(item.symbol.code)")
+            Text("\(item.symbol.marketTag) \(item.symbol.displayCode)")
                 .font(.system(size: 13).monospacedDigit())
                 .foregroundStyle(.secondary)
             KindTag(kind: item.symbol.kind)
@@ -118,15 +123,21 @@ struct StockDetailView: View {
         return LazyVGrid(columns: columns, spacing: 12) {
             if let q = quote {
                 stat("今开", Fmt.price(q.open, decimals: q.decimals), reference: q)
-                stat("昨收", Fmt.price(q.prevClose, decimals: q.decimals), reference: nil)
+                stat(q.symbol.isFuture ? "昨结" : "昨收", Fmt.price(q.prevClose, decimals: q.decimals), reference: nil)
                 stat("最高", Fmt.price(q.high, decimals: q.decimals), reference: q, value: q.high)
                 stat("最低", Fmt.price(q.low, decimals: q.decimals), reference: q, value: q.low)
-                stat("成交量", Fmt.volume(q.volume), reference: nil)
-                stat("成交额", Fmt.amount(q.amount), reference: nil)
-                stat("换手率", q.turnover.map(Fmt.plainPercent) ?? "--", reference: nil)
+                // 全球指数没有成交量/额数据,显示 --
+                let noVolume = q.symbol.isFuture && q.symbol.kind == .index
+                stat("成交量", noVolume ? "--" : Fmt.volume(q.volume), reference: nil)
+                stat("成交额", noVolume || q.amount <= 0 ? "--" : Fmt.amount(q.amount), reference: nil)
+                if q.symbol.isFuture {
+                    stat("持仓量", q.openInterest.map(Fmt.volume) ?? "--", reference: nil)
+                } else {
+                    stat("换手率", q.turnover.map(Fmt.plainPercent) ?? "--", reference: nil)
+                }
                 stat("振幅", q.prevClose > 0 ? Fmt.plainPercent((q.high - q.low) / q.prevClose * 100) : "--", reference: nil)
             } else {
-                ForEach(["今开", "昨收", "最高", "最低", "成交量", "成交额", "换手率", "振幅"], id: \.self) { stat($0, "--", reference: nil) }
+                ForEach(["今开", item.symbol.isFuture ? "昨结" : "昨收", "最高", "最低", "成交量", "成交额", item.symbol.isFuture ? "持仓量" : "换手率", "振幅"], id: \.self) { stat($0, "--", reference: nil) }
             }
         }
     }
@@ -153,7 +164,7 @@ struct StockDetailView: View {
         HStack(spacing: 10) {
             legendItem("分时", color: Theme.color(.up, redUp: env.prefs.redUp))
             legendItem("均价", color: .orange)
-            legendItem("昨收", color: .secondary)
+            legendItem(item.symbol.isFuture ? "昨结" : "昨收", color: .secondary)
         }
         .font(.system(size: 10))
         .foregroundStyle(.secondary)
@@ -163,6 +174,59 @@ struct StockDetailView: View {
         HStack(spacing: 4) {
             Capsule().fill(color).frame(width: 12, height: 2)
             Text(text)
+        }
+    }
+}
+
+/// 期货合约信息面板:替代 A 股的五档盘口(期货免费源不提供五档)
+struct FuturesInfoView: View {
+    let symbol: StockSymbol
+    let quote: Quote?
+    let series: MinuteSeries?
+    private let prefs = AppEnvironment.shared.prefs
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("合约信息").font(.system(size: 13, weight: .semibold))
+                Spacer()
+            }
+            if symbol.kind == .index {
+                info("市场", "全球指数")
+                info("代码", symbol.displayCode)
+            } else {
+                info("交易所", symbol.marketTag)
+                info("合约", symbol.displayCode)
+                info("昨结算", quote.map { Fmt.price($0.prevClose, decimals: $0.decimals) } ?? "--")
+                info("持仓量", quote?.openInterest.map(Fmt.volume) ?? "--")
+            }
+            if let series {
+                Divider()
+                Text("交易时段").font(.system(size: 11)).foregroundStyle(.secondary)
+                ForEach(series.axis.sessionTexts, id: \.self) { text in
+                    Text(text).font(.system(size: 12).monospacedDigit())
+                }
+            }
+            Divider()
+            Text(note).font(.system(size: 10.5)).foregroundStyle(.tertiary).fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 280, alignment: .topLeading)
+        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.primary.opacity(0.04)))
+    }
+
+    private var note: String {
+        symbol.kind == .index
+            ? "涨跌幅按前收盘价计算。"
+            : "涨跌幅按昨结算价计算;成交量、持仓量单位为手。免费数据源不提供期货五档盘口。"
+    }
+
+    private func info(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title).font(.system(size: 11)).foregroundStyle(.secondary)
+            Spacer()
+            Text(value).font(.system(size: 12.5, weight: .medium).monospacedDigit())
         }
     }
 }

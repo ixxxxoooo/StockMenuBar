@@ -68,8 +68,8 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
             let quote = env.quotes.ticker(for: symbol).quote
             let color = Theme.nsColor(quote?.trend ?? .flat, redUp: redUp)
             if !compact {
-                let name = quote?.name ?? env.watchlist.firstItem(for: symbol)?.name ?? symbol.code
-                let label = useName ? name : symbol.code
+                let name = quote?.name ?? env.watchlist.firstItem(for: symbol)?.name ?? symbol.displayCode
+                let label = useName ? name : symbol.displayCode
                 result.append(NSAttributedString(string: label + " ", attributes: [.font: labelFont, .foregroundColor: NSColor.labelColor]))
             }
             let price = quote.map { Fmt.price($0.price, decimals: $0.decimals) } ?? "--"

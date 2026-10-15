@@ -69,20 +69,42 @@ final class SearchViewModel {
         errorText = nil
     }
 
-    /// 执行一次联想请求
+    /// 执行一次联想请求:A 股/ETF 与期货/全球指数并行搜索,再合并。
+    /// 单一来源失败不影响另一来源;预置期货(铜、煤、日经…)本地即时匹配,离线也可用。
     private func perform(_ key: String) async {
-        do {
-            let routed = try await router.search(key)
-            guard !Task.isCancelled else { return }
-            let ranked = Self.rank(routed.value, query: key)
-            cache[key.lowercased()] = ranked
-            results = ranked
-            resultsQuery = key
-            errorText = nil
-        } catch {
-            guard !Task.isCancelled, !(error is CancellationError) else { return }
+        let router = self.router
+        // 纯数字代码(5 位以上)只可能是 A 股,不查期货
+        let skipFutures = key.count >= 5 && key.allSatisfy { $0.isASCII && $0.isNumber }
+        async let stockTask: Result<[SearchResult], Error> = {
+            do { return .success(try await router.search(key).value) } catch { return .failure(error) }
+        }()
+        async let futureTask: Result<[SearchResult], Error> = {
+            if skipFutures { return .success([]) }
+            do { return .success(try await router.searchFutures(key).value) } catch { return .failure(error) }
+        }()
+        let (stockResult, futureResult) = await (stockTask, futureTask)
+        guard !Task.isCancelled else { return }
+
+        let local = skipFutures ? [] : FuturesCatalog.localSearch(key)
+        var stocks: [SearchResult] = []
+        var remoteFutures: [SearchResult] = []
+        var failures = 0
+        switch stockResult { case .success(let r): stocks = r; case .failure: failures += 1 }
+        switch futureResult { case .success(let r): remoteFutures = r; case .failure: failures += 1 }
+
+        if failures == 2 && local.isEmpty {
             results = []
             errorText = "搜索失败,请稍后重试"
+        } else {
+            // 命中预置期货关键词(如"铜")时期货优先,否则 A 股优先
+            let futures = Self.rank(local + remoteFutures, query: key)
+            let merged = local.isEmpty ? Self.rank(stocks, query: key) + futures : futures + Self.rank(stocks, query: key)
+            var seen = Set<StockSymbol>()
+            let unique = merged.filter { seen.insert($0.symbol).inserted }
+            cache[key.lowercased()] = unique
+            results = unique
+            resultsQuery = key
+            errorText = nil
         }
         isSearching = false
     }
@@ -97,9 +119,9 @@ final class SearchViewModel {
         var seen = Set<StockSymbol>()
         let unique = results.filter { seen.insert($0.symbol).inserted }
         func weight(_ r: SearchResult) -> Int {
-            if r.symbol.code == key { return 0 }
+            if r.symbol.displayCode.caseInsensitiveCompare(key) == .orderedSame { return 0 }
             if r.name.hasPrefix(key) || r.pinyin.hasPrefix(upper) { return 1 }
-            if r.symbol.code.hasPrefix(key) { return 2 }
+            if r.symbol.displayCode.lowercased().hasPrefix(key.lowercased()) { return 2 }
             return 3
         }
         return unique.enumerated()

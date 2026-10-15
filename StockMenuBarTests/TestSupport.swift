@@ -38,7 +38,7 @@ actor CallLog {
 /// 可编排行为的模拟数据源
 struct MockProvider: QuoteProvider {
     let id: ProviderID
-    let capabilities: Set<ProviderCapability> = [.quotes, .minute, .search]
+    var capabilities: Set<ProviderCapability> = [.quotes, .minute, .search]
     let log: CallLog
     let behavior: @Sendable () async throws -> [Quote]
 

@@ -111,8 +111,8 @@ struct SettingsView: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     ForEach(symbols) { symbol in
                         HStack(spacing: 6) {
-                            Text(env.quotes.quote(for: symbol)?.name ?? env.watchlist.firstItem(for: symbol)?.name ?? symbol.code)
-                            Text(symbol.code).foregroundStyle(.secondary).monospacedDigit()
+                            Text(env.quotes.quote(for: symbol)?.name ?? env.watchlist.firstItem(for: symbol)?.name ?? symbol.displayCode)
+                            Text(symbol.displayCode).foregroundStyle(.secondary).monospacedDigit()
                             Button { remove(symbol) } label: { Image(systemName: "xmark.circle.fill") }
                                 .buttonStyle(.plain).foregroundStyle(.secondary)
                         }

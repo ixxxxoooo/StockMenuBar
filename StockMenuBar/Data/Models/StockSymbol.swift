@@ -8,22 +8,25 @@
 
 import Foundation
 
-/// 交易所
+/// 交易所/市场
+/// - 期货与全球指数统一归入 `.future`:其 `code` 为东财 secid(如 `113.cum`、`101.HG00Y`),大小写敏感
 enum Market: String, Codable, Sendable, CaseIterable {
     case sh, sz, bj
+    case future = "fu"
 
     var title: String {
         switch self {
         case .sh: return "沪"
         case .sz: return "深"
         case .bj: return "京"
+        case .future: return "期"
         }
     }
 }
 
 /// 证券类别/板块
 enum SecurityKind: String, Codable, Sendable {
-    case main, gem, star, beijing, etf, index
+    case main, gem, star, beijing, etf, index, future
 
     /// 板块展示名称
     var title: String {
@@ -34,10 +37,11 @@ enum SecurityKind: String, Codable, Sendable {
         case .beijing: return "北交所"
         case .etf: return "ETF"
         case .index: return "指数"
+        case .future: return "期货"
         }
     }
 
-    /// 价格小数位数(ETF/基金 3 位,其余 2 位)
+    /// 价格小数位数(ETF/基金 3 位,其余 2 位;期货以行情自带小数位为准,见 Quote.decimals)
     var decimals: Int { self == .etf ? 3 : 2 }
 
     /// 根据市场与代码推断类别
@@ -59,6 +63,9 @@ enum SecurityKind: String, Codable, Sendable {
         case .bj:
             if code.hasPrefix("899") { return .index }
             return .beijing
+        case .future:
+            // 东财市场号 100 为全球指数(如日经 225),其余为期货合约
+            return code.hasPrefix("100.") ? .index : .future
         }
     }
 }
@@ -76,8 +83,28 @@ struct StockSymbol: Hashable, Codable, Sendable, Identifiable {
     /// 类别
     var kind: SecurityKind { SecurityKind.infer(market: market, code: code) }
 
-    /// 东财 secid,如 `1.600519`(沪为 1,深/京为 0)
-    var eastmoneySecid: String { (market == .sh ? "1." : "0.") + code }
+    /// 东财 secid,如 `1.600519`(沪为 1,深/京为 0);期货的 code 本身就是 secid
+    var eastmoneySecid: String {
+        switch market {
+        case .sh: return "1." + code
+        case .sz, .bj: return "0." + code
+        case .future: return code
+        }
+    }
+
+    /// 是否为期货/全球指数类标的
+    var isFuture: Bool { market == .future }
+
+    /// 界面展示用代码:期货去掉东财市场号,如 `113.cum` → `cum`
+    var displayCode: String {
+        guard isFuture, let dot = code.firstIndex(of: ".") else { return code }
+        return String(code[code.index(after: dot)...])
+    }
+
+    /// 界面展示用市场/交易所名称:A 股为 SH/SZ/BJ,期货为上期所、COMEX 等
+    var marketTag: String {
+        isFuture ? FuturesCatalog.exchangeName(secid: code) : market.rawValue.uppercased()
+    }
 
     init(market: Market, code: String) {
         self.market = market
@@ -86,7 +113,16 @@ struct StockSymbol: Hashable, Codable, Sendable, Identifiable {
 
     /// 由完整代码构造,如 `sh600519`;格式不合法返回 nil
     init?(full: String) {
-        let text = full.trimmingCharacters(in: .whitespaces).lowercased()
+        let raw = full.trimmingCharacters(in: .whitespaces)
+        // 期货:`fu` + 东财 secid(市场号.代码,代码大小写敏感)
+        if raw.hasPrefix("fu"), raw.count > 5 {
+            let secid = String(raw.dropFirst(2))
+            let parts = secid.split(separator: ".", omittingEmptySubsequences: false)
+            guard parts.count == 2, parts[0].allSatisfy({ $0.isASCII && $0.isNumber }), !parts[0].isEmpty, !parts[1].isEmpty else { return nil }
+            self.init(market: .future, code: secid)
+            return
+        }
+        let text = raw.lowercased()
         guard text.count == 8,
               let market = Market(rawValue: String(text.prefix(2))) else { return nil }
         let code = String(text.suffix(6))

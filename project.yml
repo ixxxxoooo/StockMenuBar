@@ -43,7 +43,7 @@ targets:
         PRODUCT_NAME: StockMenuBar
         ENABLE_HARDENED_RUNTIME: NO
         COMBINE_HIDPI_IMAGES: YES
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
   StockMenuBarTests:
     type: bundle.unit-test
     platform: macOS

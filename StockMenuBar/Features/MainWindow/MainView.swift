@@ -26,7 +26,6 @@ struct MainView: View {
         } detail: {
             detail
         }
-        .frame(minWidth: 940, minHeight: 620)
         .onAppear {
             if nav.selection == nil, let first = env.watchlist.groups.flatMap(\.items).first {
                 nav.selection = .item(first.id)
@@ -51,7 +50,7 @@ struct MainView: View {
         return List(selection: $nav.selection) {
             ForEach(groups) { group in
                 let items = key.isEmpty ? group.items : group.items.filter {
-                    Pinyin.matches(keyword: key, name: $0.name, code: $0.symbol.code)
+                    Pinyin.matches(keyword: key, name: $0.name, code: $0.symbol.displayCode)
                 }
                 if key.isEmpty || !items.isEmpty {
                     Section {
@@ -76,16 +75,49 @@ struct MainView: View {
             }
         }
         .listStyle(.sidebar)
-        .searchable(text: $filter, placement: .sidebar, prompt: "过滤:名称 / 代码 / 拼音")
-        .toolbar {
-            ToolbarItemGroup {
-                Button { showAdd = true } label: { Image(systemName: "plus") }
-                    .help("搜索并添加自选")
-                    .popover(isPresented: $showAdd, arrowEdge: .bottom) { AddStockView() }
-                Button { showGroupManager = true } label: { Image(systemName: "folder.badge.gearshape") }
-                    .help("管理分组")
+        // 过滤框与操作按钮放在侧栏内部(而不是 .searchable / .toolbar):
+        // 避免折叠/展开侧栏时系统把工具栏项在侧栏与标题栏之间迁移,造成卡顿闪烁
+        .safeAreaInset(edge: .top, spacing: 0) { filterBar }
+        .safeAreaInset(edge: .bottom, spacing: 0) { sidebarActions }
+    }
+
+    /// 侧栏顶部过滤框(支持名称/代码/拼音首字母)
+    private var filterBar: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(.secondary)
+            TextField("过滤:名称 / 代码 / 拼音", text: $filter)
+                .textFieldStyle(.plain)
+                .font(.system(size: 12.5))
+            if !filter.isEmpty {
+                Button { filter = "" } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.plain).foregroundStyle(.tertiary)
             }
         }
+        .padding(.horizontal, 8)
+        .frame(height: 26)
+        .background(.quaternary.opacity(0.7), in: RoundedRectangle(cornerRadius: 7))
+        .padding(.horizontal, 10)
+        .padding(.top, 6)
+        .padding(.bottom, 6)
+        .frame(maxWidth: .infinity)
+        .background(.bar)
+    }
+
+    /// 侧栏底部操作:添加自选、管理分组
+    private var sidebarActions: some View {
+        HStack(spacing: 4) {
+            Button { showAdd = true } label: { Label("添加自选", systemImage: "plus") }
+                .help("搜索并添加自选")
+                .popover(isPresented: $showAdd, arrowEdge: .top) { AddStockView() }
+            Spacer()
+            Button { showGroupManager = true } label: { Image(systemName: "folder.badge.gearshape") }
+                .help("管理分组")
+        }
+        .buttonStyle(.borderless)
+        .font(.system(size: 12))
+        .padding(.horizontal, 12)
+        .frame(height: 34)
+        .background(.bar)
     }
 
     private func groupHeader(_ group: WatchGroup) -> some View {
@@ -167,7 +199,7 @@ struct SidebarRow: View {
                         Image(systemName: "pin.fill").font(.system(size: 8)).foregroundStyle(.secondary)
                     }
                 }
-                Text(item.symbol.code).font(.system(size: 10.5).monospacedDigit()).foregroundStyle(.secondary)
+                Text(item.symbol.displayCode).font(.system(size: 10.5).monospacedDigit()).foregroundStyle(.secondary)
             }
             Spacer(minLength: 4)
             VStack(alignment: .trailing, spacing: 1) {

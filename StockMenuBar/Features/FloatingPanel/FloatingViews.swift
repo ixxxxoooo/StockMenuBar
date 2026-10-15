@@ -112,7 +112,7 @@ struct FloatingCapsuleView: View {
         let trend = quote?.trend ?? .flat
         let color = trend == .flat ? Color.secondary : Theme.color(trend, redUp: env.prefs.redUp)
         HStack(spacing: 8) {
-            Text(quote?.name ?? env.watchlist.firstItem(for: symbol)?.name ?? symbol.code)
+            Text(quote?.name ?? env.watchlist.firstItem(for: symbol)?.name ?? symbol.displayCode)
                 .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
                 .frame(maxWidth: 78, alignment: .leading)
@@ -157,7 +157,7 @@ struct FloatingListRow: View {
         let trend = quote?.trend ?? .flat
         let color = trend == .flat ? Color.secondary : Theme.color(trend, redUp: env.prefs.redUp)
         HStack(spacing: 6) {
-            Text(quote?.name ?? env.watchlist.firstItem(for: symbol)?.name ?? symbol.code)
+            Text(quote?.name ?? env.watchlist.firstItem(for: symbol)?.name ?? symbol.displayCode)
                 .font(.system(size: 12, weight: .medium))
                 .lineLimit(1)
                 .frame(width: 70, alignment: .leading)
@@ -195,10 +195,10 @@ struct FloatingCardView: View {
         let color = trend == .flat ? Color.secondary : Theme.color(trend, redUp: env.prefs.redUp)
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
-                Text(quote?.name ?? env.watchlist.firstItem(for: symbol)?.name ?? symbol.code)
+                Text(quote?.name ?? env.watchlist.firstItem(for: symbol)?.name ?? symbol.displayCode)
                     .font(.system(size: 12, weight: .semibold))
                     .lineLimit(1)
-                Text(symbol.code).font(.system(size: 10).monospacedDigit()).foregroundStyle(.secondary)
+                Text(symbol.displayCode).font(.system(size: 10).monospacedDigit()).foregroundStyle(.secondary)
                 Spacer()
             }
             .padding(.trailing, 18)

@@ -13,6 +13,43 @@ import SwiftUI
 final class FloatingPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+
+    /// 拖动起点:鼠标屏幕坐标与窗口原点的差值
+    private var dragOffset: NSPoint?
+    /// 本次按下后是否已发生真实位移(用于区分点击与拖动)
+    private var didDrag = false
+
+    /// 自行实现"按住任意位置拖动窗口"。
+    /// SwiftUI 承载视图不会声明 mouseDownCanMoveWindow,系统自带的背景拖动不生效;
+    /// 这里在事件分发前计算位移,并继续把事件交给 SwiftUI,保证点击、右键菜单、悬停照常工作。
+    override func sendEvent(_ event: NSEvent) {
+        switch event.type {
+        case .leftMouseDown:
+            let mouse = NSEvent.mouseLocation
+            dragOffset = NSPoint(x: mouse.x - frame.origin.x, y: mouse.y - frame.origin.y)
+            didDrag = false
+        case .leftMouseDragged:
+            if let offset = dragOffset {
+                let mouse = NSEvent.mouseLocation
+                let target = NSPoint(x: mouse.x - offset.x, y: mouse.y - offset.y)
+                // 位移超过 3pt 才视为拖动,避免轻微抖动吞掉点击
+                if didDrag || hypot(target.x - frame.origin.x, target.y - frame.origin.y) > 3 {
+                    didDrag = true
+                    setFrameOrigin(target)
+                }
+            }
+        case .leftMouseUp:
+            dragOffset = nil
+            if didDrag {
+                didDrag = false
+                // 拖动结束不再把抬起事件当作点击交给内容视图
+                return
+            }
+        default:
+            break
+        }
+        super.sendEvent(event)
+    }
 }
 
 @MainActor
@@ -67,7 +104,8 @@ final class FloatingPanelController: NSObject {
         panel.backgroundColor = .clear
         panel.hasShadow = true
         panel.hidesOnDeactivate = false
-        panel.isMovableByWindowBackground = true
+        // 拖动由 FloatingPanel.sendEvent 自行处理,关闭系统背景拖动避免重复位移
+        panel.isMovableByWindowBackground = false
         panel.isReleasedWhenClosed = false
         panel.titleVisibility = .hidden
         let hosting = NSHostingView(rootView: FloatingRootView())

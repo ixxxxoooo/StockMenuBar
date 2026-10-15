@@ -93,6 +93,11 @@ final class QuoteStore {
     /// 今天是否已被判定为休市(数据兜底)
     var isMarketClosedToday: Bool { marketClosedDay == ChinaTime.dayString(Date()) }
 
+    /// 某标的当前是否处于可能有成交的时段:A 股看交易阶段,期货看期货窗口
+    func isActivelyTrading(_ symbol: StockSymbol) -> Bool {
+        symbol.isFuture ? clock.futuresMayBeOpen(at: Date()) : currentPhase != .closed
+    }
+
     /// 获取(必要时创建)某只证券的行情容器
     func ticker(for symbol: StockSymbol) -> QuoteTicker {
         if let t = tickers[symbol] { return t }
@@ -181,7 +186,7 @@ final class QuoteStore {
     ///   - maxAge: 缓存有效期(秒);默认交易时段 8 秒,休市 10 分钟
     /// - Returns: 分时序列;失败时返回旧缓存(可能为 nil)
     func minuteSeries(for symbol: StockSymbol, maxAge: TimeInterval? = nil) async -> MinuteSeries? {
-        let ttl = maxAge ?? (currentPhase == .closed ? 600 : 8)
+        let ttl = maxAge ?? (isActivelyTrading(symbol) ? 8 : 600)
         let cached = minuteCache[symbol]
         if let cached, Date().timeIntervalSince(cached.fetchedAt) < ttl { return cached.series }
         if power.isSuspended { return cached?.series }
@@ -192,8 +197,13 @@ final class QuoteStore {
             try? await router.minute(for: symbol).value
         }
         minuteInflight[symbol] = task
-        let series = await task.value
+        var series = await task.value
         minuteInflight[symbol] = nil
+        // 期货:统一以实时行情的昨结算价作为分时基准,避免不同数据源口径(昨收/昨结)不一致
+        if var s = series, symbol.isFuture, let prev = quote(for: symbol)?.prevClose, prev > 0, s.prevClose != prev {
+            s.prevClose = prev
+            series = s
+        }
         if let series {
             minuteCache[symbol] = (series, Date())
             return series
@@ -233,6 +243,12 @@ final class MinuteLoader {
             }
             isLoading = false
             let phase = store.currentPhase
+            if symbol.isFuture {
+                // 期货:在可能开市的窗口内持续刷新,窗口外取到一次即停
+                if !store.isActivelyTrading(symbol) && series != nil { return }
+                try? await Task.sleep(for: .seconds(max(tradingInterval, 10)))
+                continue
+            }
             if phase == .closed && series != nil { return }
             let wait: TimeInterval = phase == .trading ? tradingInterval : (phase == .lunch ? 60 : 30)
             try? await Task.sleep(for: .seconds(wait))

@@ -178,7 +178,7 @@ struct SearchViewModelTests {
 struct WatchlistStoreTests {
     @Test func 首次启动写入默认分组() {
         let store = WatchlistStore(inMemory: true)
-        #expect(store.groups.map(\.name) == ["大盘", "自选A", "自选B", "ETF"])
+        #expect(store.groups.map(\.name) == ["大盘", "自选A", "自选B", "ETF", "期货"])
         #expect(store.groups[0].items.count == 4)
         #expect(store.selectedGroup?.name == "大盘")
         #expect(store.allSymbols.contains(StockSymbol(full: "sh600519")!))
@@ -211,10 +211,10 @@ struct WatchlistStoreTests {
         #expect(store.groups.last?.name == "港股通")
         store.renameGroup(id: newID, to: "科技")
         #expect(store.groups.last?.name == "科技")
-        store.moveGroups(from: IndexSet(integer: 4), to: 0)
+        store.moveGroups(from: IndexSet(integer: 5), to: 0)
         #expect(store.groups.first?.name == "科技")
         store.deleteGroup(id: newID)
-        #expect(store.groups.count == 4)
+        #expect(store.groups.count == 5)
         #expect(store.addGroup(name: "  ") == nil)
     }
 

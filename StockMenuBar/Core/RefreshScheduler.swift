@@ -46,9 +46,23 @@ final class RefreshScheduler {
     ///   - marketClosedToday: 是否被数据兜底判定今日休市
     ///   - interval: 用户设定的交易时段间隔
     ///   - conserving: 低电量/高热,间隔翻倍
+    ///   - watchingFutures: 自选/固定标的中是否含期货;含期货时,A 股休市但期货可能开市(夜盘、外盘)也要轮询
     nonisolated static func decide(now: Date, clock: TradingClock, suspended: Bool, hasConsumers: Bool,
-                       marketClosedToday: Bool, interval: Int, conserving: Bool) -> RefreshDecision {
+                       marketClosedToday: Bool, interval: Int, conserving: Bool,
+                       watchingFutures: Bool = false) -> RefreshDecision {
         if suspended || !hasConsumers { return .idle(600) }
+        let base = decideAShare(now: now, clock: clock, marketClosedToday: marketClosedToday, interval: interval, conserving: conserving)
+        // A 股交易时段内已按用户间隔轮询,无需覆盖;其余时段若期货可能开市,按不低于 5 秒的间隔轮询
+        if watchingFutures, clock.futuresMayBeOpen(at: now) {
+            if case .poll(let seconds) = base, seconds <= Double(max(interval, 5)) * (conserving ? 2 : 1) { return base }
+            return .poll(Double(max(interval, 5)) * (conserving ? 2 : 1))
+        }
+        return base
+    }
+
+    /// A 股时段决策(原有逻辑)
+    nonisolated private static func decideAShare(now: Date, clock: TradingClock, marketClosedToday: Bool,
+                                                 interval: Int, conserving: Bool) -> RefreshDecision {
         switch clock.phase(at: now) {
         case .trading:
             if marketClosedToday { return .poll(300) }
@@ -92,7 +106,8 @@ final class RefreshScheduler {
             let decision = Self.decide(
                 now: Date(), clock: store.clock, suspended: store.isSuspended, hasConsumers: hasConsumers(),
                 marketClosedToday: store.isMarketClosedToday, interval: prefs.refreshInterval,
-                conserving: store.power.isConserving
+                conserving: store.power.isConserving,
+                watchingFutures: store.symbolsProvider().contains(where: \.isFuture)
             )
             switch decision {
             case .poll(let seconds):

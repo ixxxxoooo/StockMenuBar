@@ -49,6 +49,7 @@ final class WatchlistStore {
             container = try! ModelContainer(for: schema, configurations: [memory])
         }
         seedIfNeeded()
+        if !inMemory { migrateFuturesGroupIfNeeded() }
         reload()
         selectedGroupID = groups.first?.id
     }
@@ -207,7 +208,8 @@ final class WatchlistStore {
             ("大盘", [("sh000001", "上证指数"), ("sz399001", "深证成指"), ("sz399006", "创业板指"), ("sh000300", "沪深300")]),
             ("自选A", [("sh600519", "贵州茅台"), ("sz000001", "平安银行"), ("sz300750", "宁德时代")]),
             ("自选B", []),
-            ("ETF", [("sh510300", "沪深300ETF"), ("sz159915", "创业板ETF")])
+            ("ETF", [("sh510300", "沪深300ETF"), ("sz159915", "创业板ETF")]),
+            ("期货", FuturesCatalog.defaults.map { ($0.symbol.full, $0.name) })
         ]
         for (gi, seed) in seeds.enumerated() {
             let g = GroupEntity(name: seed.0, order: gi)
@@ -215,6 +217,24 @@ final class WatchlistStore {
             for (ii, item) in seed.1.enumerated() {
                 context.insert(ItemEntity(symbolFull: item.0, name: item.1, order: ii, group: g))
             }
+        }
+        try? context.save()
+        UserDefaults.standard.set(true, forKey: Self.futuresSeededKey)
+    }
+
+    /// 期货分组是否已写入过的标记(只写一次,用户删除后不再自动恢复)
+    private static let futuresSeededKey = "watchlist.futuresSeeded"
+
+    /// 老用户升级:自动追加「期货」分组与预置品种(铜、煤、日经),仅执行一次
+    private func migrateFuturesGroupIfNeeded() {
+        guard !UserDefaults.standard.bool(forKey: Self.futuresSeededKey) else { return }
+        UserDefaults.standard.set(true, forKey: Self.futuresSeededKey)
+        let existing = (try? context.fetch(FetchDescriptor<GroupEntity>())) ?? []
+        guard !existing.contains(where: { $0.name == "期货" }) else { return }
+        let g = GroupEntity(name: "期货", order: existing.count)
+        context.insert(g)
+        for (i, preset) in FuturesCatalog.defaults.enumerated() {
+            context.insert(ItemEntity(symbolFull: preset.symbol.full, name: preset.name, order: i, group: g))
         }
         try? context.save()
     }

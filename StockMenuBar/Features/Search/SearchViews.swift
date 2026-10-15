@@ -56,7 +56,7 @@ struct SearchResultsView: View {
                 ForEach(localMatches) { item in
                     HStack(spacing: 8) {
                         Text(item.name).font(.system(size: 13, weight: .medium))
-                        Text(item.symbol.code).font(.system(size: 11).monospacedDigit()).foregroundStyle(.secondary)
+                        Text(item.symbol.displayCode).font(.system(size: 11).monospacedDigit()).foregroundStyle(.secondary)
                         KindTag(kind: item.symbol.kind)
                         Spacer()
                         Image(systemName: "star.fill").foregroundStyle(.yellow).font(.system(size: 11))
@@ -111,7 +111,7 @@ struct SearchResultsView: View {
                 .background(RoundedRectangle(cornerRadius: 4).fill(Color.secondary.opacity(0.2)))
             VStack(alignment: .leading, spacing: 1) {
                 Text(result.name).font(.system(size: 13, weight: .medium)).lineLimit(1)
-                Text(result.symbol.code).font(.system(size: 11).monospacedDigit()).foregroundStyle(.secondary)
+                Text(result.symbol.displayCode).font(.system(size: 11).monospacedDigit()).foregroundStyle(.secondary)
             }
             KindTag(kind: result.kind)
             Spacer()

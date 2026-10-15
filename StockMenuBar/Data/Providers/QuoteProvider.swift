@@ -24,6 +24,8 @@ enum ProviderID: String, Sendable, CaseIterable, Hashable {
 /// 数据源能力
 enum ProviderCapability: Sendable, Hashable {
     case quotes, minute, search
+    /// 期货/全球指数的实时行情、分时、搜索
+    case futuresQuotes, futuresMinute, futuresSearch
 }
 
 /// 数据源错误
@@ -86,17 +88,27 @@ protocol QuoteProvider: Sendable {
     var id: ProviderID { get }
     var capabilities: Set<ProviderCapability> { get }
 
+    /// 是否能服务某个具体标的(默认只看能力集)。
+    /// 例如新浪只有国内期货分时、东财才有全部外盘,路由据此在发请求前过滤,避免无意义的失败计数污染熔断统计。
+    func canServe(_ capability: ProviderCapability, symbol: StockSymbol?) -> Bool
+
     /// 批量获取实时行情
     func fetchQuotes(_ symbols: [StockSymbol]) async throws -> [Quote]
     /// 获取当日分时
     func fetchMinute(symbol: StockSymbol) async throws -> MinuteSeries
     /// 搜索联想
     func search(keyword: String) async throws -> [SearchResult]
+    /// 搜索期货与全球指数
+    func searchFutures(keyword: String) async throws -> [SearchResult]
 }
 
 extension QuoteProvider {
+    func canServe(_ capability: ProviderCapability, symbol: StockSymbol?) -> Bool {
+        capabilities.contains(capability)
+    }
     func fetchMinute(symbol: StockSymbol) async throws -> MinuteSeries { throw ProviderError.unsupported }
     func search(keyword: String) async throws -> [SearchResult] { throw ProviderError.unsupported }
+    func searchFutures(keyword: String) async throws -> [SearchResult] { throw ProviderError.unsupported }
 }
 
 /// 解析辅助

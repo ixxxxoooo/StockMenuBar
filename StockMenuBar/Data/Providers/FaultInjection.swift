@@ -15,7 +15,11 @@ struct FaultInjectedProvider: QuoteProvider {
     var id: ProviderID { base.id }
     var capabilities: Set<ProviderCapability> { base.capabilities }
 
+    func canServe(_ capability: ProviderCapability, symbol: StockSymbol?) -> Bool {
+        base.canServe(capability, symbol: symbol)
+    }
     func fetchQuotes(_ symbols: [StockSymbol]) async throws -> [Quote] { throw ProviderError.httpStatus(503) }
+    func searchFutures(keyword: String) async throws -> [SearchResult] { throw ProviderError.httpStatus(503) }
     func fetchMinute(symbol: StockSymbol) async throws -> MinuteSeries { throw ProviderError.httpStatus(503) }
     func search(keyword: String) async throws -> [SearchResult] { throw ProviderError.httpStatus(503) }
 }
