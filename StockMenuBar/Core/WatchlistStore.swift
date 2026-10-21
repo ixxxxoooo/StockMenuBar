@@ -281,7 +281,7 @@ final class WatchlistStore {
     }
 
     /// 预置分组版本号:每次新增预置分组时 +1,老用户升级时只补写新增的分组
-    private static let catalogVersion = 2
+    private static let catalogVersion = 3
     private static let catalogVersionKey = "watchlist.catalogVersion"
     /// 旧版本(仅期货分组)的标记,仅用于判断用户是否已经见过「期货」分组
     private static let legacyFuturesSeededKey = "watchlist.futuresSeeded"
@@ -293,6 +293,14 @@ final class WatchlistStore {
         let defaults = UserDefaults.standard
         guard defaults.integer(forKey: Self.catalogVersionKey) < Self.catalogVersion else { return }
         defer { defaults.set(Self.catalogVersion, forKey: Self.catalogVersionKey) }
+        // v3:现货黄金补进已有的「贵金属」分组(其余新增分组逻辑不变)
+        if let metals = (try? context.fetch(FetchDescriptor<GroupEntity>()))?.first(where: { $0.name == "贵金属" }) {
+            let gold = FuturesCatalog.spotGold
+            let owned = ((try? context.fetch(FetchDescriptor<ItemEntity>())) ?? []).map(\.symbolFull)
+            if !owned.contains(gold.symbol.full) {
+                context.insert(ItemEntity(symbolFull: gold.symbol.full, name: gold.name, order: metals.items.count, group: metals))
+            }
+        }
         let legacySeeded = defaults.bool(forKey: Self.legacyFuturesSeededKey)
         var existing = (try? context.fetch(FetchDescriptor<GroupEntity>())) ?? []
         var owned = Set(existing.flatMap { $0.items.map(\.symbolFull) })

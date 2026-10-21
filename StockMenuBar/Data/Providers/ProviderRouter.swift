@@ -33,7 +33,7 @@ struct RouterConfig: Sendable {
     var failureThreshold: Int = 3
     var openDuration: TimeInterval = 30
     /// 各源初始延迟先验(秒),决定冷启动时的优先顺序
-    var latencyPrior: [ProviderID: TimeInterval] = [.tencent: 0.30, .sina: 0.40, .eastmoney: 0.50, .yahoo: 0.90]
+    var latencyPrior: [ProviderID: TimeInterval] = [.tencent: 0.30, .sina: 0.40, .eastmoney: 0.50, .yahoo: 0.90, .tradingview: 1.20]
 
     static let `default` = RouterConfig()
 }
@@ -89,7 +89,8 @@ actor ProviderRouter {
             TencentProvider(http: http),
             SinaProvider(http: http),
             EastmoneyProvider(http: http),
-            YahooProvider(http: http)
+            YahooProvider(http: http),
+            TradingViewProvider(http: http)
         ]
         return ProviderRouter(providers: FaultInjection.apply(to: providers))
     }
@@ -168,6 +169,16 @@ actor ProviderRouter {
                                  operation: { provider in try await provider.fetchMinute(symbol: symbol) })
     }
 
+    /// 获取日/周/月 K 线
+    /// 固定优先级:腾讯 → 新浪 → 雅虎(A 股走腾讯/新浪,期货与全球指数走新浪/雅虎);现货黄金只有 TradingView 覆盖
+    func kline(for symbol: StockSymbol, period: KLinePeriod) async throws -> RoutedResult<KLineSeries> {
+        try await execute(capability: .kline,
+                          priority: [.tencent, .sina, .yahoo],
+                          coverage: { provider in Self.coverage(of: provider, capability: .kline, symbols: [symbol]) },
+                          validate: { (s: KLineSeries) in !s.bars.isEmpty },
+                          operation: { provider in try await provider.fetchKLine(symbol: symbol, period: period) })
+    }
+
     /// 搜索联想(空结果也视为成功,不触发转移)
     func search(_ keyword: String) async throws -> RoutedResult<[SearchResult]> {
         try await execute(capability: .search,
@@ -210,7 +221,7 @@ actor ProviderRouter {
     /// 候选源排序:先按熔断可用性筛选,再按 延迟 × (1 + 5 × 失败率) 升序。
     /// 全部熔断时「失败放行」(fail-open),仍按评分尝试,保证最大可用性。
     /// 覆盖全部标的的数据源优先于只覆盖部分标的的数据源(后者仅作兜底)
-    private func rankedCandidates(excluding: Set<ProviderID> = [], coverage: @Sendable (any QuoteProvider) -> Coverage) -> [ProviderID] {
+    private func rankedCandidates(excluding: Set<ProviderID> = [], priority: [ProviderID] = [], coverage: @Sendable (any QuoteProvider) -> Coverage) -> [ProviderID] {
         let now = clock()
         var level: [ProviderID: Coverage] = [:]
         for id in order where !excluding.contains(id) { if let p = providers[id] { level[id] = coverage(p) } }
@@ -220,6 +231,9 @@ actor ProviderRouter {
         return pool.sorted { a, b in
             let la = level[a]?.rawValue ?? 0, lb = level[b]?.rawValue ?? 0
             if la != lb { return la > lb }
+            // 指定了优先级的数据源固定排在前面,其余按健康评分
+            let pa = priority.firstIndex(of: a) ?? Int.max, pb = priority.firstIndex(of: b) ?? Int.max
+            if pa != pb { return pa < pb }
             return score(a) < score(b)
         }
     }
@@ -232,11 +246,12 @@ actor ProviderRouter {
     private func execute<T: Sendable>(
         capability: ProviderCapability,
         excluding: Set<ProviderID> = [],
+        priority: [ProviderID] = [],
         coverage: @Sendable (any QuoteProvider) -> Coverage,
         validate: @escaping @Sendable (T) -> Bool,
         operation: @escaping @Sendable (any QuoteProvider) async throws -> T
     ) async throws -> RoutedResult<T> {
-        let candidates = rankedCandidates(excluding: excluding, coverage: coverage)
+        let candidates = rankedCandidates(excluding: excluding, priority: priority, coverage: coverage)
         guard !candidates.isEmpty else { throw ProviderError.unsupported }
         let hedge = config.hedgeDelay
         let providerMap = providers

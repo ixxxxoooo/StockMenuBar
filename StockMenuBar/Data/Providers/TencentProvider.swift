@@ -10,7 +10,7 @@ import Foundation
 
 struct TencentProvider: QuoteProvider {
     let id: ProviderID = .tencent
-    let capabilities: Set<ProviderCapability> = [.quotes, .minute, .search, .futuresQuotes, .futuresMinute]
+    let capabilities: Set<ProviderCapability> = [.quotes, .minute, .search, .futuresQuotes, .futuresMinute, .kline]
     private let http: HTTPClient
 
     init(http: HTTPClient) { self.http = http }
@@ -19,6 +19,8 @@ struct TencentProvider: QuoteProvider {
     func canServe(_ capability: ProviderCapability, symbol: StockSymbol?) -> Bool {
         guard capabilities.contains(capability) else { return false }
         guard let symbol, symbol.isFuture else { return true }
+        // K 线:期货/全球指数无数据源
+        if capability == .kline { return false }
         return FuturesCatalog.tencentCode(secid: symbol.code) != nil
     }
 
@@ -42,6 +44,15 @@ struct TencentProvider: QuoteProvider {
             all += TencentParser.parseQuotes(text)
         }
         return all
+    }
+
+    func fetchKLine(symbol: StockSymbol, period: KLinePeriod) async throws -> KLineSeries {
+        guard !symbol.isFuture,
+              let url = URL(string: "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=\(symbol.full),\(period.tencentKey),,,\(KLineConfig.fetchCount),qfq") else {
+            throw ProviderError.unsupported
+        }
+        let data = try await http.send(URLRequest(url: url))
+        return try TencentParser.parseKLine(data, symbol: symbol, period: period)
     }
 
     func fetchMinute(symbol: StockSymbol) async throws -> MinuteSeries {
@@ -71,6 +82,27 @@ struct TencentProvider: QuoteProvider {
 
 /// 腾讯数据解析(纯函数,便于测试)
 enum TencentParser {
+    /// 解析 fqkline:`["日期","开","收","高","低","量(手)"]`;复权数据在 `qfq<周期>`,指数在 `<周期>`。
+    /// 指数成交量单位与 A 股不一致,一律记 0(图表自动隐藏量能)
+    static func parseKLine(_ data: Data, symbol: StockSymbol, period: KLinePeriod) throws -> KLineSeries {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let all = root["data"] as? [String: Any],
+              let node = all[symbol.full] as? [String: Any],
+              let rows = (node["qfq" + period.tencentKey] ?? node[period.tencentKey]) as? [[Any]] else {
+            throw ProviderError.invalidData("K线结构")
+        }
+        let isIndex = symbol.kind == .index
+        let bars: [KLineBar] = rows.compactMap { r in
+            guard r.count >= 5, let date = r[0] as? String,
+                  let o = ParseUtil.double(r[1]), let c = ParseUtil.double(r[2]),
+                  let h = ParseUtil.double(r[3]), let l = ParseUtil.double(r[4]), c > 0, h >= l else { return nil }
+            let volume = (!isIndex && r.count > 5) ? ParseUtil.double(r[5]) ?? 0 : 0
+            return KLineBar(date: date, open: o, close: c, high: h, low: l, volume: volume, amount: 0)
+        }
+        guard !bars.isEmpty else { throw ProviderError.invalidData("K线为空") }
+        return KLineSeries(symbol: symbol, period: period, bars: bars, source: .tencent, decimals: symbol.kind.decimals)
+    }
+
     /// 解析实时行情文本。字段以 `~` 分隔:
     /// 1 名称, 3 现价, 4 昨收, 5 今开, 9-18 买一至买五(价,量), 19-28 卖一至卖五, 30 时间,
     /// 33 最高, 34 最低, 36 成交量(手), 37 成交额(万), 38 换手率

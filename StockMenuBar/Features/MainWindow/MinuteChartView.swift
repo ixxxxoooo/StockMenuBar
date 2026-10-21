@@ -11,7 +11,7 @@ import Charts
 import SwiftUI
 
 /// 让两张图共享悬停十字光标
-private struct ChartHoverModifier: ViewModifier {
+struct ChartHoverModifier: ViewModifier {
     @Binding var hoverIndex: Int?
     /// 横轴最大序号(A 股 240,期货按品种时段)
     let maxIndex: Int

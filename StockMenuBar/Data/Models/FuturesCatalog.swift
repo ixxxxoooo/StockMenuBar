@@ -27,13 +27,16 @@ enum FuturesCatalog {
         let tencentCode: String?
         /// 雅虎财经代码(如 `^KS11`、`GC=F`),为空表示雅虎不支持
         let yahooCode: String?
+        /// TradingView 代码(如 `OANDA:XAUUSD`),为空表示不支持;现货黄金只由它提供
+        let tradingViewCode: String?
         /// 东财是否收录(如韩国创业板东财没有)
         let inEastmoney: Bool
         /// 所属主题,用于文档与分组
         let theme: String
 
         init(_ name: String, _ secid: String, _ pinyin: String, sina: String? = nil, scale: Double = 1,
-             tencent: String? = nil, yahoo: String? = nil, eastmoney: Bool = true, theme: String) {
+             tencent: String? = nil, yahoo: String? = nil, tradingView: String? = nil,
+             eastmoney: Bool = true, theme: String) {
             self.name = name
             self.secid = secid
             self.pinyin = pinyin
@@ -41,6 +44,7 @@ enum FuturesCatalog {
             self.sinaScale = scale
             self.tencentCode = tencent
             self.yahooCode = yahoo
+            self.tradingViewCode = tradingView
             self.inEastmoney = eastmoney
             self.theme = theme
         }
@@ -65,8 +69,12 @@ enum FuturesCatalog {
         Preset("纽约银", "101.SI00Y", "NYY", sina: "hf_SI", yahoo: "SI=F", theme: "贵金属"),
         Preset("伦敦银", "122.XAG", "LDY", sina: "hf_XAG", theme: "贵金属"),
         Preset("沪金主连", "113.aum", "HJZL", sina: "nf_AU0", theme: "贵金属"),
-        Preset("沪银主连", "113.agm", "HYZL", sina: "nf_AG0", theme: "贵金属")
+        Preset("沪银主连", "113.agm", "HYZL", sina: "nf_AG0", theme: "贵金属"),
+        spotGold
     ]
+
+    /// 现货黄金(XAU/USD):不在东财/新浪/雅虎体系内,secid 为自定义的 `999.XAUUSD`,数据全部来自 TradingView
+    static let spotGold = Preset("现货黄金", "999.XAUUSD", "XHHJ", tradingView: "OANDA:XAUUSD", eastmoney: false, theme: "贵金属")
 
     /// 默认写入「全球指数」分组的指数:美股三大指数、日经 225、韩国综合与创业板
     static let globalIndices: [Preset] = [
@@ -113,6 +121,9 @@ enum FuturesCatalog {
     /// 雅虎代码
     static func yahooCode(secid: String) -> String? { preset(secid: secid)?.yahooCode }
 
+    /// TradingView 代码
+    static func tradingViewCode(secid: String) -> String? { preset(secid: secid)?.tradingViewCode }
+
     /// 腾讯行情键到证券的反查
     static func symbol(tencentKey: String, among requested: [StockSymbol]) -> StockSymbol? {
         requested.first { s in s.isFuture && tencentCode(secid: s.code)?.lowercased() == tencentKey.lowercased() }
@@ -146,6 +157,7 @@ enum FuturesCatalog {
         case "109": return "LME"
         case "112": return "ICE"
         case "122": return "伦敦现货"
+        case "999": return "现货"
         case "100": return "全球指数"
         default: return "外盘"
         }

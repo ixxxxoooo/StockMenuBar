@@ -22,7 +22,7 @@ struct GlobalCatalogTests {
 
     @Test func 分组种子包含贵金属与全球指数() {
         let groups = Dictionary(uniqueKeysWithValues: FuturesCatalog.groupSeeds.map { ($0.name, $0.presets.map(\.name)) })
-        #expect(groups["贵金属"] == ["纽约金", "伦敦金", "纽约银", "伦敦银", "沪金主连", "沪银主连"])
+        #expect(groups["贵金属"] == ["纽约金", "伦敦金", "纽约银", "伦敦银", "沪金主连", "沪银主连", "现货黄金"])
         #expect(groups["全球指数"]?.contains("道琼斯") == true)
         #expect(groups["全球指数"]?.contains("韩国KOSPI") == true)
         #expect(groups["全球指数"]?.contains("韩国KOSDAQ") == true)

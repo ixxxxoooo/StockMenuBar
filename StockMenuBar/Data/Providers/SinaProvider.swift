@@ -10,7 +10,7 @@ import Foundation
 
 struct SinaProvider: QuoteProvider {
     let id: ProviderID = .sina
-    let capabilities: Set<ProviderCapability> = [.quotes, .minute, .search, .futuresQuotes, .futuresMinute]
+    let capabilities: Set<ProviderCapability> = [.quotes, .minute, .search, .futuresQuotes, .futuresMinute, .kline]
     private let http: HTTPClient
 
     init(http: HTTPClient) { self.http = http }
@@ -20,7 +20,12 @@ struct SinaProvider: QuoteProvider {
         guard capabilities.contains(capability) else { return false }
         guard let symbol, symbol.isFuture else { return true }
         guard let mapping = FuturesCatalog.sinaMapping(secid: symbol.code) else { return false }
-        return capability == .futuresMinute ? (mapping.code.hasPrefix("nf_") || mapping.code.hasPrefix("hf_")) : true
+        switch capability {
+        case .futuresMinute: return mapping.code.hasPrefix("nf_") || mapping.code.hasPrefix("hf_")
+        // K 线:国内期货(nf_)、外盘期货(hf_)、美股指数(gb_);日韩指数(znb_)没有
+        case .kline: return mapping.code.hasPrefix("nf_") || mapping.code.hasPrefix("hf_") || mapping.code.hasPrefix("gb_")
+        default: return true
+        }
     }
 
     func fetchQuotes(_ symbols: [StockSymbol]) async throws -> [Quote] {
@@ -66,6 +71,32 @@ struct SinaProvider: QuoteProvider {
         if mapping.code.hasPrefix("hf_") {
             let data = try await get("https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t=/GlobalFuturesService.getGlobalFuturesMinLine?symbol=\(key)")
             return try SinaParser.parseGlobalFuturesMinute(data, symbol: symbol, scale: mapping.scale)
+        }
+        throw ProviderError.unsupported
+    }
+
+    /// 日/周/月 K 线:A 股按周期取(scale 240/1200/7200);期货与美股指数只有日线,解析时聚合
+    func fetchKLine(symbol: StockSymbol, period: KLinePeriod) async throws -> KLineSeries {
+        if !symbol.isFuture {
+            let scale = [KLinePeriod.day: 240, .week: 1200, .month: 7200][period] ?? 240
+            let data = try await get("https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20t=/CN_MarketDataService.getKLineData?symbol=\(symbol.full)&scale=\(scale)&ma=no&datalen=\(KLineConfig.fetchCount)")
+            return try SinaKLineParser.parse(data, symbol: symbol, period: period, layout: .aShare)
+        }
+        guard let mapping = FuturesCatalog.sinaMapping(secid: symbol.code) else { throw ProviderError.unsupported }
+        let key = String(mapping.code.dropFirst(3))
+        if mapping.code.hasPrefix("nf_") {
+            let data = try await get("https://stock2.finance.sina.com.cn/futures/api/json.php/InnerFuturesNewService.getDailyKLine?symbol=\(key)")
+            return try SinaKLineParser.parse(data, symbol: symbol, period: period, layout: .domesticFutures)
+        }
+        if mapping.code.hasPrefix("hf_") {
+            let data = try await get("https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t=/GlobalFuturesService.getGlobalFuturesDailyKLine?symbol=\(key)")
+            return try SinaKLineParser.parse(data, symbol: symbol, period: period, layout: .globalFutures, scale: mapping.scale)
+        }
+        if mapping.code.hasPrefix("gb_") {
+            // gb_$dji → .dji,gb_ixic → .ixic
+            let us = "." + key.replacingOccurrences(of: "$", with: "")
+            let data = try await get("https://stock.finance.sina.com.cn/usstock/api/jsonp.php/var%20t=/US_MinKService.getDailyK?symbol=\(us)")
+            return try SinaKLineParser.parse(data, symbol: symbol, period: period, layout: .usIndex)
         }
         throw ProviderError.unsupported
     }

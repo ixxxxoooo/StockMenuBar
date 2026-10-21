@@ -12,7 +12,7 @@ import Foundation
 
 struct YahooProvider: QuoteProvider {
     let id: ProviderID = .yahoo
-    let capabilities: Set<ProviderCapability> = [.futuresQuotes, .futuresMinute]
+    let capabilities: Set<ProviderCapability> = [.futuresQuotes, .futuresMinute, .kline]
     private let http: HTTPClient
 
     init(http: HTTPClient) { self.http = http }
@@ -59,13 +59,21 @@ struct YahooProvider: QuoteProvider {
         return try YahooParser.parseMinute(data, symbol: symbol)
     }
 
+    /// 日/周/月 K 线:interval 1d/1wk/1mo,区间按周期取足 250 根以上
+    func fetchKLine(symbol: StockSymbol, period: KLinePeriod) async throws -> KLineSeries {
+        guard let code = FuturesCatalog.yahooCode(secid: symbol.code) else { throw ProviderError.unsupported }
+        let (interval, range) = [KLinePeriod.day: ("1d", "2y"), .week: ("1wk", "6y"), .month: ("1mo", "max")][period] ?? ("1d", "2y")
+        let data = try await Self.fetchChart(http: http, code: code, interval: interval, range: range)
+        return try YahooParser.parseKLine(data, symbol: symbol, period: period)
+    }
+
     /// 请求 chart 接口:query1 失败时换 query2 再试一次
-    private static func fetchChart(http: HTTPClient, code: String, interval: String) async throws -> Data {
+    private static func fetchChart(http: HTTPClient, code: String, interval: String, range: String = "1d") async throws -> Data {
         let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._"))
         let encoded = code.addingPercentEncoding(withAllowedCharacters: allowed) ?? code
         var lastError: Error = ProviderError.emptyResponse
         for host in ["query1", "query2"] {
-            guard let url = URL(string: "https://\(host).finance.yahoo.com/v8/finance/chart/\(encoded)?interval=\(interval)&range=1d") else {
+            guard let url = URL(string: "https://\(host).finance.yahoo.com/v8/finance/chart/\(encoded)?interval=\(interval)&range=\(range)") else {
                 throw ProviderError.invalidData("URL")
             }
             do { return try await http.send(URLRequest(url: url)) } catch { lastError = error }

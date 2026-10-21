@@ -10,7 +10,7 @@ import Foundation
 
 /// 数据源标识
 enum ProviderID: String, Sendable, CaseIterable, Hashable {
-    case tencent, sina, eastmoney, yahoo
+    case tencent, sina, eastmoney, yahoo, tradingview
 
     var displayName: String {
         switch self {
@@ -18,6 +18,7 @@ enum ProviderID: String, Sendable, CaseIterable, Hashable {
         case .sina: return "新浪"
         case .eastmoney: return "东财"
         case .yahoo: return "雅虎"
+        case .tradingview: return "TradingView"
         }
     }
 }
@@ -27,6 +28,8 @@ enum ProviderCapability: Sendable, Hashable {
     case quotes, minute, search
     /// 期货/全球指数的实时行情、分时、搜索
     case futuresQuotes, futuresMinute, futuresSearch
+    /// 日/周/月 K 线(含期货与全球指数)
+    case kline
 }
 
 /// 数据源错误
@@ -97,6 +100,8 @@ protocol QuoteProvider: Sendable {
     func fetchQuotes(_ symbols: [StockSymbol]) async throws -> [Quote]
     /// 获取当日分时
     func fetchMinute(symbol: StockSymbol) async throws -> MinuteSeries
+    /// 获取日/周/月 K 线
+    func fetchKLine(symbol: StockSymbol, period: KLinePeriod) async throws -> KLineSeries
     /// 搜索联想
     func search(keyword: String) async throws -> [SearchResult]
     /// 搜索期货与全球指数
@@ -108,6 +113,7 @@ extension QuoteProvider {
         capabilities.contains(capability)
     }
     func fetchMinute(symbol: StockSymbol) async throws -> MinuteSeries { throw ProviderError.unsupported }
+    func fetchKLine(symbol: StockSymbol, period: KLinePeriod) async throws -> KLineSeries { throw ProviderError.unsupported }
     func search(keyword: String) async throws -> [SearchResult] { throw ProviderError.unsupported }
     func searchFutures(keyword: String) async throws -> [SearchResult] { throw ProviderError.unsupported }
 }

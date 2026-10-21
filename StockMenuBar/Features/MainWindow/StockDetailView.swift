@@ -12,6 +12,9 @@ struct StockDetailView: View {
     let item: WatchItem
     private let env = AppEnvironment.shared
     @State private var loader = MinuteLoader(store: AppEnvironment.shared.quotes)
+    @State private var klineLoader = KLineLoader(store: AppEnvironment.shared.quotes)
+    /// 图表模式:分时 / 日K / 周K / 月K
+    @State private var chartMode: ChartMode = .minute
     /// 手动重试计数:变化时重启分时加载任务
     @State private var retryToken = 0
 
@@ -26,12 +29,19 @@ struct StockDetailView: View {
                 HStack(alignment: .top, spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("当日分时").font(.system(size: 13, weight: .semibold))
+                            modePicker
                             Spacer()
-                            legend
+                            if chartMode == .minute { legend }
                         }
-                        MinuteChartView(series: loader.series, isLoading: loader.isLoading, failed: loader.failed) {
-                            retryToken += 1
+                        if case .kline(let period) = chartMode {
+                            KLineChartView(series: klineLoader.series, isLoading: klineLoader.isLoading, failed: klineLoader.failed) {
+                                retryToken += 1
+                            }
+                            .id(period)
+                        } else {
+                            MinuteChartView(series: loader.series, isLoading: loader.isLoading, failed: loader.failed) {
+                                retryToken += 1
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity)
@@ -52,6 +62,21 @@ struct StockDetailView: View {
         .task(id: "\(item.symbol.full)#\(retryToken)") {
             await loader.run(symbol: item.symbol, tradingInterval: 10)
         }
+        .task(id: "\(item.symbol.full)#\(chartMode.id)#\(retryToken)") {
+            guard case .kline(let period) = chartMode else { return }
+            await klineLoader.run(symbol: item.symbol, period: period)
+        }
+        .onChange(of: item.symbol) { chartMode = .minute }
+    }
+
+    /// 分时 / 日K / 周K / 月K 切换
+    private var modePicker: some View {
+        Picker("图表", selection: $chartMode) {
+            ForEach(ChartMode.allCases) { Text($0.title).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
     }
 
     // MARK: - 头部
@@ -241,6 +266,28 @@ struct FuturesInfoView: View {
             Text(title).font(.system(size: 11)).foregroundStyle(.secondary)
             Spacer()
             Text(value).font(.system(size: 12.5, weight: .medium).monospacedDigit())
+        }
+    }
+}
+
+/// 详情图表模式
+enum ChartMode: Hashable, Identifiable {
+    case minute
+    case kline(KLinePeriod)
+
+    static let allCases: [ChartMode] = [.minute] + KLinePeriod.allCases.map { .kline($0) }
+
+    var id: String {
+        switch self {
+        case .minute: return "minute"
+        case .kline(let p): return p.rawValue
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .minute: return "分时"
+        case .kline(let p): return p.title
         }
     }
 }
