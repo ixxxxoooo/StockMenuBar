@@ -57,8 +57,13 @@ final class FloatingPanelController: NSObject {
     private let env = AppEnvironment.shared
     private var panel: FloatingPanel?
     private var moveTask: Task<Void, Never>?
+    private var shrinkTask: Task<Void, Never>?
     private var lastShown = false
     private var moveObserver: NSObjectProtocol?
+    /// 程序调整尺寸期间(含展开分时图)产生的移动通知不是用户拖动,不触发吸边与位置保存
+    private var ignoreMovesUntil = Date.distantPast
+    /// 当前窗口为分类面板向左多出的宽度(内容区左边缘 = 窗口左边缘 + leftExtra)
+    private var leftExtra: CGFloat = 0
 
     /// 开始观察偏好与状态,按需显示/隐藏/调整悬浮窗
     func setup() {
@@ -75,14 +80,22 @@ final class FloatingPanelController: NSObject {
         let style = prefs.floatingStyle
         let count = env.floatingSymbols.count
         let clickThrough = prefs.floatingClickThrough
+        // 列表样式窗口恒取"展开后"的最大高度,悬停展开只在窗口内部动画,避免窗口缩放与内容布局不同步造成顶部跳动
+        let expanded = style == .list && count > 0
+        let categoryOpen = env.ui.floatingCategoryOpen && shouldShow
+        let categoryRows = categoryOpen ? env.watchlist.groups.count + 2 : nil
 
         if shouldShow {
             let panel = ensurePanel()
             panel.ignoresMouseEvents = clickThrough
-            resize(panel, to: FloatingLayout.size(style: style, count: count))
+            let card = FloatingLayout.size(style: style, count: count, expanded: expanded)
+            let extra = categoryOpen ? FloatingLayout.categoryWidth + FloatingLayout.categoryGap : 0
+            resize(panel, to: FloatingLayout.windowSize(card: card, categoryRows: categoryRows), leftExtra: extra)
             if !panel.isVisible { panel.orderFrontRegardless() }
         } else {
             panel?.orderOut(nil)
+            // 隐藏后再显示时不保留展开的分类面板
+            if env.ui.floatingCategoryOpen { Task { @MainActor [env] in env.ui.setFloatingCategory(false) } }
         }
         if shouldShow != lastShown {
             lastShown = shouldShow
@@ -108,7 +121,7 @@ final class FloatingPanelController: NSObject {
         panel.isMovableByWindowBackground = false
         panel.isReleasedWhenClosed = false
         panel.titleVisibility = .hidden
-        let hosting = NSHostingView(rootView: FloatingRootView())
+        let hosting = NSHostingView(rootView: FloatingRootView().refreshOnStealthChange())
         hosting.sizingOptions = []
         panel.contentView = hosting
 
@@ -125,23 +138,45 @@ final class FloatingPanelController: NSObject {
         return panel
     }
 
-    /// 调整尺寸并保持左上角不动
-    private func resize(_ panel: FloatingPanel, to size: CGSize) {
+    /// 调整尺寸并保持左上角不动。
+    /// 窗口缩放动画与 SwiftUI 内容动画并发会不同步(内容已按新高度布局,窗口还没长高,顶部被上顶裁掉),
+    /// 所以窗口本身不做动画:变高时立即长到目标高度(多出的下方区域透明),内容在其中做动画;
+    /// 变矮时等内容收起动画结束后再缩小。
+    private func resize(_ panel: FloatingPanel, to size: CGSize, leftExtra extra: CGFloat) {
+        shrinkTask?.cancel()
         let old = panel.frame
-        guard abs(old.width - size.width) > 0.5 || abs(old.height - size.height) > 0.5 else { return }
-        let frame = NSRect(x: old.minX, y: old.maxY - size.height, width: size.width, height: size.height)
-        panel.setFrame(frame, display: true, animate: panel.isVisible)
+        guard abs(old.width - size.width) > 0.5 || abs(old.height - size.height) > 0.5 || extra != leftExtra else { return }
+        if size.height < old.height - 0.5 || size.width < old.width - 0.5, panel.isVisible {
+            shrinkTask = Task { @MainActor [weak self, weak panel] in
+                try? await Task.sleep(for: .milliseconds(260))
+                guard !Task.isCancelled, let self, let panel else { return }
+                self.applyFrame(panel, size, leftExtra: extra)
+            }
+        } else {
+            applyFrame(panel, size, leftExtra: extra)
+        }
+    }
+
+    /// 以顶边和内容区左边缘为基准一次性设置窗口尺寸(不带窗口动画);分类面板向左加宽,卡片位置不动
+    private func applyFrame(_ panel: FloatingPanel, _ size: CGSize, leftExtra extra: CGFloat) {
+        let old = panel.frame
+        let frame = NSRect(x: old.minX + leftExtra - extra, y: old.maxY - size.height, width: size.width, height: size.height)
+        leftExtra = extra
+        ignoreMovesUntil = Date().addingTimeInterval(0.6)
+        panel.setFrame(frame, display: true, animate: false)
     }
 
     /// 拖动结束(停止移动 0.25 秒)后吸附边缘并保存位置
     private func panelDidMove() {
+        guard Date() >= ignoreMovesUntil else { return }
         moveTask?.cancel()
         moveTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled, let self, let panel = self.panel else { return }
-            self.snapToEdges(panel)
+            // 分类面板展开期间窗口左侧含透明扩展区,不吸边;保存位置按内容区左边缘计算
+            if self.leftExtra == 0 { self.snapToEdges(panel) }
             let frame = panel.frame
-            self.env.prefs.saveFloatingOrigin(x: frame.minX, y: frame.maxY)
+            self.env.prefs.saveFloatingOrigin(x: frame.minX + self.leftExtra, y: frame.maxY)
         }
     }
 

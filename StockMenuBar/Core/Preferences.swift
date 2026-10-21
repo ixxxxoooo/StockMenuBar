@@ -46,6 +46,8 @@ final class Preferences {
     var refreshInterval: Int { didSet { defaults.set(refreshInterval, forKey: "refreshInterval") } }
     /// 红涨绿跌(true)或绿涨红跌(false)
     var redUp: Bool { didSet { defaults.set(redUp, forKey: "redUp") } }
+    /// 摸鱼模式:低饱和配色、关闭价格闪色(与机器/场景相关,不进入备份)
+    var stealthMode: Bool { didSet { defaults.set(stealthMode, forKey: "stealthMode"); Theme.stealth = stealthMode } }
     /// 菜单栏标识:名称/代码
     var menuBarLabel: MenuBarLabelMode { didSet { defaults.set(menuBarLabel.rawValue, forKey: "menuBarLabel") } }
     /// 菜单栏紧凑模式:只显示价格与涨跌幅
@@ -63,6 +65,8 @@ final class Preferences {
     var floatingStyle: FloatingStyle { didSet { defaults.set(floatingStyle.rawValue, forKey: "floatingStyle") } }
     /// 悬浮窗监控的标的(完整代码)
     var floatingSymbols: [String] { didSet { defaults.set(floatingSymbols, forKey: "floatingSymbols") } }
+    /// 悬浮窗当前分类:nil = 默认(手动勾选,否则跟随主面板分组);"all" = 全部自选;其余为分组 UUID 字符串
+    var floatingGroupID: String? { didSet { defaults.set(floatingGroupID, forKey: "floatingGroupID") } }
     /// 悬浮窗背景不透明度 0.3~1.0
     var floatingOpacity: Double { didSet { defaults.set(floatingOpacity, forKey: "floatingOpacity") } }
     /// 鼠标移出后窗口淡化
@@ -88,6 +92,7 @@ final class Preferences {
         let interval = defaults.integer(forKey: "refreshInterval")
         refreshInterval = Preferences.allowedIntervals.contains(interval) ? interval : 3
         redUp = defaults.object(forKey: "redUp") as? Bool ?? true
+        stealthMode = defaults.bool(forKey: "stealthMode")
         menuBarLabel = MenuBarLabelMode(rawValue: defaults.string(forKey: "menuBarLabel") ?? "") ?? .name
         menuBarCompact = defaults.bool(forKey: "menuBarCompact")
         menuBarRotate = defaults.bool(forKey: "menuBarRotate")
@@ -97,6 +102,7 @@ final class Preferences {
         floatingVisible = defaults.bool(forKey: "floatingVisible")
         floatingStyle = FloatingStyle(rawValue: defaults.string(forKey: "floatingStyle") ?? "") ?? .list
         floatingSymbols = defaults.stringArray(forKey: "floatingSymbols") ?? []
+        floatingGroupID = defaults.string(forKey: "floatingGroupID")
         let opacity = defaults.object(forKey: "floatingOpacity") as? Double ?? 0.85
         floatingOpacity = min(max(opacity, 0.3), 1.0)
         floatingFade = defaults.object(forKey: "floatingFade") as? Bool ?? true
@@ -105,6 +111,7 @@ final class Preferences {
         lastUpdateCheck = defaults.object(forKey: "lastUpdateCheck") as? Date
         skippedUpdateVersion = defaults.string(forKey: "skippedUpdateVersion")
         launchAtLogin = SMAppService.mainApp.status == .enabled
+        Theme.stealth = stealthMode
     }
 
     // MARK: - 开机自启

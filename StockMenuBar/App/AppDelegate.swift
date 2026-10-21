@@ -15,6 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let env = AppEnvironment.shared
     private var statusController: StatusItemController?
     private let mainWindow = MainWindowController()
+    private var commaMonitor: Any?
     private let floating = FloatingPanelController()
     private var mainWasVisibleBeforeBoss = false
 
@@ -101,6 +102,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         HotKeyCenter.shared.register(keyCode: kVK_ANSI_H, modifiers: mods, id: 3) { [weak self] in
             self?.toggleBossKey()
+        }
+        // ⌘, 进入偏好设置:菜单栏弹窗没有主菜单,用本地事件监听保证在应用任意窗口都生效
+        commaMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+                  event.keyCode == UInt16(kVK_ANSI_Comma) else { return event }
+            self?.openPreferences()
+            return nil
+        }
+        // ⌥⌘M 一键切换摸鱼模式
+        HotKeyCenter.shared.register(keyCode: kVK_ANSI_M, modifiers: mods, id: 5) { [weak self] in
+            self?.env.prefs.stealthMode.toggle()
         }
     }
 

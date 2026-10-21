@@ -10,6 +10,16 @@ import AppKit
 import SwiftUI
 
 enum Theme {
+    /// 摸鱼模式:涨跌色降饱和、降对比,由 Preferences 同步(界面根视图随开关重建以刷新颜色)
+    nonisolated(unsafe) static var stealth = false
+
+    private static let mutedRed = dynamic(
+        light: NSColor(srgbRed: 0.62, green: 0.48, blue: 0.48, alpha: 1),
+        dark: NSColor(srgbRed: 0.62, green: 0.52, blue: 0.52, alpha: 1))
+    private static let mutedGreen = dynamic(
+        light: NSColor(srgbRed: 0.46, green: 0.56, blue: 0.50, alpha: 1),
+        dark: NSColor(srgbRed: 0.50, green: 0.60, blue: 0.54, alpha: 1))
+
     /// 上涨/下跌语义色(随浅深色模式自适应)
     private static func dynamic(light: NSColor, dark: NSColor) -> NSColor {
         NSColor(name: nil) { appearance in
@@ -29,6 +39,7 @@ enum Theme {
     ///   - trend: 涨跌方向
     ///   - redUp: 红涨绿跌
     static func nsColor(_ trend: Trend, redUp: Bool) -> NSColor {
+        let red = stealth ? mutedRed : red, green = stealth ? mutedGreen : green
         switch trend {
         case .up: return redUp ? red : green
         case .down: return redUp ? green : red
@@ -45,7 +56,7 @@ enum Theme {
     static func badgeFill(_ trend: Trend, redUp: Bool) -> Color {
         switch trend {
         case .flat: return Color(nsColor: .systemGray)
-        default: return color(trend, redUp: redUp)
+        default: return color(trend, redUp: redUp).opacity(stealth ? 0.8 : 1)
         }
     }
 

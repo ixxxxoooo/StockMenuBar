@@ -34,6 +34,9 @@ struct SettingsView: View {
                 Toggle("红涨绿跌(A 股习惯)", isOn: $prefs.redUp)
                 Text(prefs.redUp ? "上涨显示红色,下跌显示绿色" : "已反转:上涨显示绿色,下跌显示红色")
                     .font(.footnote).foregroundStyle(.secondary)
+                Toggle("摸鱼模式(⌥⌘M 一键切换)", isOn: $prefs.stealthMode)
+                Text("涨跌色降为低饱和灰调、关闭价格变动闪色,整体不再醒目;红涨绿跌的方向习惯保持不变。")
+                    .font(.footnote).foregroundStyle(.secondary)
             }
 
             Section("菜单栏") {
@@ -80,6 +83,8 @@ struct SettingsView: View {
                         Text("⌥⌘F  显示/隐藏悬浮窗")
                         Text("⌥⌘L  悬浮窗穿透锁定开关")
                         Text("⌥⌘H  老板键:一键隐藏/恢复所有窗口")
+                        Text("⌥⌘M  摸鱼模式开关")
+                        Text("⌘,  打开偏好设置(应用内任意窗口)")
                     }
                     .font(.footnote).foregroundStyle(.secondary)
                 }

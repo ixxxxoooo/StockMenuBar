@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import SwiftUI
 import Observation
 
 /// 主面板侧边栏选择
@@ -28,6 +29,31 @@ final class MainNavigationModel {
 final class UIState {
     /// 老板键:一键隐藏所有界面
     var bossHidden = false
+    /// 悬浮迷你列表中鼠标正悬停(并展开分时图)的标的
+    var floatingHoverSymbol: StockSymbol?
+    /// 悬浮窗是否为分类面板腾出左侧空间(窗口先扩宽)
+    var floatingCategoryOpen = false
+    /// 分类面板是否已显示(窗口就位后才置位,避免内容在窗口扩宽前被挤偏)
+    var floatingCategoryShown = false
+
+    /// 展开/收起分类面板:展开时窗口先向左扩宽,下一轮再显示面板;收起时先播放收起动画,窗口随后缩回
+    /// - Parameter on: true 展开,false 收起
+    func setFloatingCategory(_ on: Bool) {
+        if on {
+            guard !floatingCategoryOpen else { return }
+            floatingCategoryOpen = true
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(40))
+                guard let self, self.floatingCategoryOpen else { return }
+                withAnimation(.snappy(duration: 0.22)) { self.floatingCategoryShown = true }
+            }
+        } else {
+            guard floatingCategoryOpen else { return }
+            floatingHoverSymbol = nil
+            withAnimation(.snappy(duration: 0.22)) { floatingCategoryShown = false }
+            floatingCategoryOpen = false
+        }
+    }
 }
 
 @MainActor
@@ -88,8 +114,12 @@ final class AppEnvironment {
         prefs.pinnedSymbols.compactMap(StockSymbol.init(full:)).filter { watchlist.containsAnywhere($0) }
     }
 
-    /// 悬浮窗监控的标的;未显式选择时取当前分组前 6 只
+    /// 悬浮窗监控的标的:选了分类则显示该分类;否则取手动勾选;都没有时取当前分组前 6 只
     var floatingSymbols: [StockSymbol] {
+        if let id = prefs.floatingGroupID {
+            if id == FloatingCategory.allID { return watchlist.allSymbols }
+            if let group = watchlist.groups.first(where: { $0.id.uuidString == id }) { return group.items.map(\.symbol) }
+        }
         let chosen = prefs.floatingSymbols.compactMap(StockSymbol.init(full:)).filter { watchlist.containsAnywhere($0) }
         if !chosen.isEmpty { return chosen }
         return (watchlist.selectedGroup?.items.prefix(6).map(\.symbol)) ?? []
@@ -104,6 +134,13 @@ final class AppEnvironment {
     }
 
     // MARK: - 动作
+
+    /// 打开主面板并定位到某只证券的详情(悬浮窗双击)
+    /// - Parameter symbol: 目标证券;不在自选里时只打开主面板
+    func openDetail(of symbol: StockSymbol) {
+        if let item = watchlist.firstItem(for: symbol) { nav.selection = .item(item.id) }
+        openMainWindow?(false)
+    }
 
     /// 菜单「检查更新…」:打开设置页并立即检查;已发现新版本时只展示结果
     func checkForUpdates() {

@@ -28,7 +28,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         popover.behavior = .transient
         popover.animates = true
         popover.delegate = self
-        let hosting = NSHostingController(rootView: PopoverView())
+        let hosting = NSHostingController(rootView: PopoverView().refreshOnStealthChange())
         hosting.sizingOptions = [.preferredContentSize]
         popover.contentViewController = hosting
 
@@ -43,6 +43,7 @@ final class StatusItemController: NSObject, NSPopoverDelegate {
         let prefs = env.prefs
         let symbols = env.pinnedSymbols
         let redUp = prefs.redUp
+        _ = prefs.stealthMode  // 建立观察:切换摸鱼模式时重绘菜单栏标题
         let useName = prefs.menuBarLabel == .name
         let compact = prefs.menuBarCompact
         let rotate = prefs.menuBarRotate && symbols.count > 1

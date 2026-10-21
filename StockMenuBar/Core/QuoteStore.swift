@@ -127,7 +127,9 @@ final class QuoteStore {
         }
         let now = Date()
         if reason == .manual, now.timeIntervalSince(lastAttempt) < 1.5 { return }
-        let symbols = symbolsProvider()
+        var symbols = symbolsProvider()
+        // 定时轮询只请求所属市场当前开市的标的:A 股已收盘/休市时不再刷新,即便期货夜盘仍在交易
+        if reason == .timer { symbols = symbols.filter(isActivelyTrading) }
         guard !symbols.isEmpty else { return }
 
         isRefreshing = true

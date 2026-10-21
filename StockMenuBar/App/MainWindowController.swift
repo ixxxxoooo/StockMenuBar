@@ -55,7 +55,7 @@ final class MainWindowController: NSObject, NSWindowDelegate {
         window.title = "StockMenuBar"
         window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
-        let hosting = NSHostingController(rootView: MainView())
+        let hosting = NSHostingController(rootView: MainView().refreshOnStealthChange())
         // 窗口尺寸完全由 NSWindow 管理,避免 SwiftUI 内容尺寸变化(折叠侧栏)反向驱动窗口重算布局
         hosting.sizingOptions = []
         window.contentViewController = hosting

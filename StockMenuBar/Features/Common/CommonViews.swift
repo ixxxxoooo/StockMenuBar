@@ -124,7 +124,7 @@ struct TickFlash: ViewModifier {
         content
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(Theme.color(ticker.flashTrend, redUp: prefs.redUp).opacity(on ? 0.22 : 0))
+                    .fill(Theme.color(ticker.flashTrend, redUp: prefs.redUp).opacity(on && !prefs.stealthMode ? 0.22 : 0))
             )
             .onChange(of: ticker.flashToken) { _, _ in
                 on = true

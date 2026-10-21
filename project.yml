@@ -35,8 +35,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.ixxxxoooo.StockMenuBar
         PRODUCT_NAME: StockMenuBar
-        MARKETING_VERSION: "1.4.0"
-        CURRENT_PROJECT_VERSION: "6"
+        MARKETING_VERSION: "1.5.0"
+        CURRENT_PROJECT_VERSION: "7"
         ENABLE_HARDENED_RUNTIME: NO
         COMBINE_HIDPI_IMAGES: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
